@@ -29,5 +29,7 @@ htmlcov/
 .DS_Store
 Thumbs.db
 
-
+# Development documentation
+CHATGPT_*.md
+INDEX.md
 *.log
