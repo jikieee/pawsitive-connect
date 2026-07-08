@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Pawsitive Connect — Admin Dashboard</title>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,600;0,700;1,500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+  <link rel="stylesheet" href="/static/css/dashboard.css?v=phase3-mobile-fix3"/>
+  <link rel="stylesheet" href="/static/css/phase3_mobile.css?v=phase3-mobile-fix3"/>
+  <script defer src="/static/js/phase3_mobile.js?v=phase3-mobile-fix3"></script>
+</head>
+<body class="admin-page">
+
+<aside class="sidebar" id="sidebar">
+  <div class="sidebar-brand">
+    <div class="brand-icon">🐾</div>
+    <div class="brand-text"><strong>Pawsitive</strong><span>Admin</span></div>
+  </div>
+
+  <span class="nav-label">Management</span>
+  <button class="nav-item active" type="button" data-admin-nav="overview" onclick="showAdminTab('overview', this)"><span class="nav-icon">🏠</span> Overview</button>
+  <button class="nav-item" type="button" data-admin-nav="users" onclick="showAdminTab('users', this)"><span class="nav-icon">👥</span> Users <span class="nav-badge">{{ total_users }}</span></button>
+  <button class="nav-item" type="button" data-admin-nav="organizations" onclick="showAdminTab('organizations', this)"><span class="nav-icon">🤝</span> Organizations <span class="nav-badge">{{ total_orgs }}</span></button>
+  <button class="nav-item" type="button" data-admin-nav="reports" onclick="showAdminTab('reports', this)"><span class="nav-icon">📋</span> Reports <span class="nav-badge">{{ pending_rescues }}</span></button>
+  <button class="nav-item" type="button" data-admin-nav="animals" onclick="showAdminTab('animals', this)"><span class="nav-icon">🐾</span> Animals <span class="nav-badge">{{ rescued_animals }}</span></button>
+
+  <span class="nav-label">System</span>
+  <button class="nav-item" type="button" data-admin-nav="announcements" onclick="showAdminTab('announcements', this)"><span class="nav-icon">📣</span> Announcements</button>
+  <button class="nav-item" type="button" data-admin-nav="notifications" onclick="showAdminTab('notifications', this)"><span class="nav-icon">🔔</span> Notifications <span class="nav-badge" data-notif-count>{{ unread_count|default:0 }}</span></button>
+  <button class="nav-item" type="button" data-admin-nav="audit" onclick="showAdminTab('audit', this)"><span class="nav-icon">🧾</span> Audit Logs</button>
+
+  <span class="nav-label">Account</span>
+  <a class="nav-item" href="{% url 'profile_settings' %}"><span class="nav-icon">⚙️</span> Settings</a>
+  <a class="nav-item" href="{% url 'logout' %}"><span class="nav-icon">↩</span> Logout</a>
+
+  <div class="sidebar-footer">
+    <div class="user-card">
+      <div class="user-avatar">{{ user.username|slice:":1"|upper }}</div>
+      <div class="user-info"><strong>{{ user.get_full_name|default:user.username }}</strong><span>Administrator</span></div>
+    </div>
+  </div>
+</aside>
+
+<div class="main">
+  <header class="topbar">
+    <h1 class="topbar-title">Admin Dashboard</h1>
+    <div class="topbar-actions">
+      <a class="btn-report" href="/admin/">Open Django Admin</a>
+    </div>
+  </header>
+
+  <div class="content admin-content">
+    {% if messages %}
+      <div class="admin-alerts">
+        {% for message in messages %}<div class="admin-alert {{ message.tags }}" style="display:none">{{ message }}</div>{% endfor %}
+      </div>
+    {% endif %}
+
+    <div class="page-greeting">
+      <h2>Hello, {{ user.get_full_name|default:user.username }} 👋</h2>
+      <p id="greeting-date">System overview</p>
+    </div>
+
+    <section class="admin-tab active" id="tab-overview">
+      <div class="stats-grid admin-stats-grid">
+        <div class="stat-card amber"><div class="stat-icon">👥</div><div class="stat-value count-up" data-target="{{ total_users }}">0</div><div class="stat-label">Total Users</div><div class="stat-change up">{{ active_users }} active</div></div>
+        <div class="stat-card sage"><div class="stat-icon">🤝</div><div class="stat-value count-up" data-target="{{ active_orgs }}">0</div><div class="stat-label">Active Organizations</div><div class="stat-change warn">{{ inactive_orgs }} inactive</div></div>
+        <div class="stat-card blue"><div class="stat-icon">📋</div><div class="stat-value count-up" data-target="{{ total_reports }}">0</div><div class="stat-label">Total Reports</div><div class="stat-change warn">{{ pending_rescues }} pending</div></div>
+        <div class="stat-card gold"><div class="stat-icon">🏡</div><div class="stat-value count-up" data-target="{{ ready_for_adoption }}">0</div><div class="stat-label">Ready for Adoption</div><div class="stat-change up">{{ adopted_animals }} adopted</div></div>
+      </div>
+
+      <div class="dashboard-grid admin-dashboard-grid">
+        <div class="card">
+          <div class="card-header"><h3 class="card-title">Monthly Activity</h3><div class="admin-table-tools"><span class="admin-muted">Reports vs rescued animals</span><a class="card-action" href="{% url 'admin_export_activity_csv' %}">Export Chart CSV</a></div></div>
+          <div class="chart-wrap admin-chart-wrap"><canvas id="activityChart"></canvas></div>
+        </div>
+        <div class="card">
+          <div class="card-header"><h3 class="card-title">System Snapshot</h3></div>
+          <div class="admin-metric-list">
+            <div><span>Responding Reports</span><strong>{{ responding_reports }}</strong></div>
+            <div><span>Completed / Closed Rescues</span><strong>{{ completed_rescues }}</strong></div>
+            <div><span>Reports This Week</span><strong>{{ reports_this_week }}</strong></div>
+            <div><span>Animals In Treatment</span><strong>{{ in_treatment }}</strong></div>
+            <div><span>Active Announcements</span><strong>{{ active_announcements }}</strong></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="reports-grid admin-bottom-grid">
+        <div class="card">
+          <div class="card-header"><h3 class="card-title">Latest Reports</h3><button class="card-action" type="button" onclick="showAdminTab('reports')">View All</button></div>
+          <div class="admin-list">
+            {% for report in reports|slice:":6" %}
+              <div class="admin-list-item">
+                <div><strong>#{{ report.id }} — {{ report.get_animal_type_display }} · {{ report.get_condition_display }}</strong><p>{{ report.location }}{% if report.reporter %} · {{ report.reporter.get_full_name|default:report.reporter.username }}{% endif %}</p></div>
+                <span class="admin-pill status-{{ report.status }}">{{ report.get_status_display }}</span>
+              </div>
+            {% empty %}<p class="admin-empty">No rescue reports yet.</p>{% endfor %}
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header"><h3 class="card-title">Recent Organizations</h3><button class="card-action" type="button" onclick="showAdminTab('organizations')">Manage</button></div>
+          <div class="admin-list">
+            {% for org in organizations|slice:":6" %}
+              <div class="admin-list-item"><div><strong>{{ org.name }}</strong><p>{{ org.contact_email }} · {{ org.address|truncatechars:40 }}</p></div><span class="admin-pill {% if org.is_active %}ok{% else %}muted{% endif %}">{% if org.is_active %}Active{% else %}Inactive{% endif %}</span></div>
+            {% empty %}<p class="admin-empty">No rescue organizations yet.</p>{% endfor %}
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="admin-tab" id="tab-users">
+      <div class="card admin-table-card">
+        <div class="card-header admin-table-header"><h3 class="card-title">User Management</h3><div class="admin-table-tools"><input class="admin-table-search" type="search" placeholder="Search users…" data-table-search="usersTable"><select class="admin-table-filter" data-table-filter="usersTable"><option value="">All roles/statuses</option><option value="Reporter">Reporter</option><option value="Rescue Organization">Rescue Organization</option><option value="Admin">Admin</option><option value="Active">Active</option><option value="Inactive">Inactive</option></select></div></div>
+        <div class="admin-table-wrap"><table class="admin-table" id="usersTable"><thead><tr><th>User</th><th>Email</th><th>Role</th><th>Organization</th><th>Joined</th><th>Status</th><th>Action</th></tr></thead><tbody>
+          {% for account in users %}
+          <tr><td><strong>{{ account.get_full_name|default:account.username }}</strong><br><small>@{{ account.username }}</small></td><td>{{ account.email|default:"—" }}</td><td>{{ account.profile.get_role_display|default:"User" }}</td><td>{% if account.profile.organization %}{{ account.profile.organization.name }}{% else %}—{% endif %}</td><td>{{ account.date_joined|date:"M d, Y" }}</td><td><span class="admin-pill {% if account.is_active %}ok{% else %}muted{% endif %}">{% if account.is_active %}Active{% else %}Inactive{% endif %}</span></td><td>{% if account != user %}<form method="post" action="{% url 'admin_toggle_user_active' account.id %}">{% csrf_token %}<button class="card-action" type="submit">{% if account.is_active %}Deactivate{% else %}Activate{% endif %}</button></form>{% else %}<span class="admin-muted">Current admin</span>{% endif %}</td></tr>
+          {% empty %}<tr><td colspan="7" class="admin-empty">No users found.</td></tr>{% endfor %}
+        </tbody></table></div><div class="admin-pagination" data-paginate-for="usersTable" data-page-size="8"></div>
+      </div>
+    </section>
+
+    <section class="admin-tab" id="tab-organizations">
+      <div class="card admin-table-card">
+        <div class="card-header admin-table-header"><h3 class="card-title">Rescue Organization Management</h3><div class="admin-table-tools"><input class="admin-table-search" type="search" placeholder="Search organizations…" data-table-search="orgsTable"><select class="admin-table-filter" data-table-filter="orgsTable"><option value="">All statuses</option><option value="Active">Active</option><option value="Inactive">Inactive</option></select></div></div>
+        <div class="admin-table-wrap"><table class="admin-table" id="orgsTable"><thead><tr><th>Organization</th><th>Contact</th><th>Address</th><th>Reports</th><th>Animals</th><th>Status</th><th>Action</th></tr></thead><tbody>
+          {% for org in organizations %}
+          <tr><td><strong>{{ org.name }}</strong><br><small>{{ org.member_count }} member{{ org.member_count|pluralize }}</small></td><td>{{ org.contact_email }}<br><small>{{ org.contact_phone }}</small></td><td>{{ org.address|truncatechars:55 }}</td><td>{{ org.report_count }}</td><td>{{ org.animal_count }}</td><td><span class="admin-pill {% if org.is_active %}ok{% else %}muted{% endif %}">{% if org.is_active %}Active{% else %}Inactive{% endif %}</span></td><td><form method="post" action="{% url 'admin_toggle_org_active' org.id %}">{% csrf_token %}<button class="card-action" type="submit">{% if org.is_active %}Deactivate{% else %}Activate{% endif %}</button></form></td></tr>
+          {% empty %}<tr><td colspan="7" class="admin-empty">No organizations found.</td></tr>{% endfor %}
+        </tbody></table></div><div class="admin-pagination" data-paginate-for="orgsTable" data-page-size="8"></div>
+      </div>
+    </section>
+
+    <section class="admin-tab" id="tab-reports">
+      <div class="card admin-table-card">
+        <div class="card-header admin-table-header"><div><h3 class="card-title">Report Management</h3><p class="admin-muted" style="margin:.25rem 0 0">Showing reports submitted by all accounts across the system.</p></div><div class="admin-table-tools"><a class="card-action" href="{% url 'admin_export_reports_csv' %}">Export CSV</a><input class="admin-table-search" type="search" placeholder="Search reports…" data-table-search="reportsTable"><select class="admin-table-filter" data-table-filter="reportsTable"><option value="">All statuses/priorities</option><option value="Pending">Pending</option><option value="Responding">Responding</option><option value="Rescued">Rescued</option><option value="Closed">Closed</option><option value="Critical / Emergency">Critical / Emergency</option><option value="High Priority">High Priority</option></select></div></div>
+        <div class="admin-table-wrap"><table class="admin-table" id="reportsTable"><thead><tr><th>#</th><th>Animal & Condition</th><th>Reporter</th><th>Organization</th><th>Location</th><th>Priority</th><th>Status</th><th>Date</th><th>Update</th><th>Details</th></tr></thead><tbody>
+          {% for report in reports %}
+          <tr data-admin-page-row><td>#{{ report.id }}</td><td><strong>{{ report.get_animal_type_display }}</strong><br><small>{{ report.get_condition_display }}</small></td><td>{% if report.reporter %}{{ report.reporter.get_full_name|default:report.reporter.username }}{% else %}Anonymous{% endif %}</td><td>{% if report.rescue_org %}{{ report.rescue_org.name }}{% else %}Unassigned{% endif %}</td><td>{{ report.location|truncatechars:50 }}</td><td><span class="admin-pill priority-{{ report.priority }}">{{ report.get_priority_display }}</span></td><td><span class="admin-pill status-{{ report.status }}">{{ report.get_status_display }}</span></td><td>{{ report.reported_at|date:"M d, Y" }}</td><td><form method="post" action="{% url 'admin_update_report_status' report.id %}" class="admin-inline-form">{% csrf_token %}<select name="status">{% for value,label in report.STATUS_CHOICES %}<option value="{{ value }}" {% if report.status == value %}selected{% endif %}>{{ label }}</option>{% endfor %}</select><button type="submit" class="card-action">Save</button></form></td><td><button class="card-action" type="button" data-report-id="{{ report.id }}" data-report-animal="{{ report.get_animal_type_display }}" data-report-condition="{{ report.get_condition_display }}" data-report-reporter="{% if report.reporter %}{{ report.reporter.get_full_name|default:report.reporter.username }}{% else %}Anonymous{% endif %}" data-report-org="{% if report.rescue_org %}{{ report.rescue_org.name }}{% else %}Unassigned{% endif %}" data-report-location="{{ report.location }}" data-report-priority="{{ report.get_priority_display }}" data-report-status="{{ report.get_status_display }}" data-report-date="{{ report.reported_at|date:'M d, Y g:i A' }}" data-report-description="{{ report.description }}" onclick="openAdminReportDetails(this)">View</button></td></tr>
+          {% empty %}<tr><td colspan="10" class="admin-empty">No reports found.</td></tr>{% endfor %}
+        </tbody></table></div><div class="admin-pagination" data-paginate-for="reportsTable" data-page-size="8"></div>
+      </div>
+    </section>
+
+    <section class="admin-tab" id="tab-animals">
+      <div class="card admin-table-card">
+        <div class="card-header admin-table-header"><h3 class="card-title">Animal Management</h3><div class="admin-table-tools"><input class="admin-table-search" type="search" placeholder="Search animals…" data-table-search="animalsTable"><select class="admin-table-filter" data-table-filter="animalsTable"><option value="">All species/statuses</option><option value="Dog">Dog</option><option value="Cat">Cat</option><option value="Ready for Adoption">Ready for Adoption</option><option value="Recovering">Recovering</option><option value="Under Observation">Under Observation</option><option value="Open">Adoption Open</option><option value="Closed">Adoption Closed</option></select></div></div>
+        <div class="admin-table-wrap"><table class="admin-table" id="animalsTable"><thead><tr><th>Animal</th><th>Species</th><th>Organization</th><th>Status</th><th>Adoption</th><th>Vaccination</th><th>Rescued</th><th>Details</th></tr></thead><tbody>
+          {% for animal in animals %}
+          <tr data-admin-page-row><td><strong>{{ animal.display_name }}</strong><br><small>{{ animal.breed|default:"No breed listed" }}</small></td><td>{{ animal.get_species_display }}</td><td>{% if animal.rescue_org %}{{ animal.rescue_org.name }}{% else %}Unassigned{% endif %}</td><td><span class="admin-pill status-{{ animal.status }}">{{ animal.get_status_display }}</span></td><td><span class="admin-pill {% if animal.adoption_open %}ok{% else %}muted{% endif %}">{% if animal.adoption_open %}Open{% else %}Closed{% endif %}</span></td><td>{{ animal.get_vaccination_display }}</td><td>{{ animal.rescued_at|date:"M d, Y" }}</td><td><button class="card-action" type="button" data-animal-name="{{ animal.display_name }}" data-animal-species="{{ animal.get_species_display }}" data-animal-breed="{{ animal.breed|default:'No breed listed' }}" data-animal-org="{% if animal.rescue_org %}{{ animal.rescue_org.name }}{% else %}Unassigned{% endif %}" data-animal-status="{{ animal.get_status_display }}" data-animal-adoption="{% if animal.adoption_open %}Open{% else %}Closed{% endif %}" data-animal-vaccination="{{ animal.get_vaccination_display }}" data-animal-shelter="{{ animal.shelter }}" data-animal-temperament="{{ animal.temperament }}" data-animal-notes="{{ animal.medical_notes }}" onclick="openAdminAnimalDetails(this)">View</button></td></tr>
+          {% empty %}<tr><td colspan="8" class="admin-empty">No rescued animals found.</td></tr>{% endfor %}
+        </tbody></table></div><div class="admin-pagination" data-paginate-for="animalsTable" data-page-size="8"></div>
+      </div>
+    </section>
+
+    <section class="admin-tab" id="tab-announcements">
+      <div class="card admin-table-card">
+        <div class="card-header admin-table-header"><h3 class="card-title">Announcements Overview</h3><div class="admin-table-tools"><input class="admin-table-search" type="search" placeholder="Search announcements…" data-table-search="announcementsTable"><select class="admin-table-filter" data-table-filter="announcementsTable"><option value="">All types/statuses</option><option value="Rescue Update">Rescue Update</option><option value="Adoption Announcement">Adoption Announcement</option><option value="Missing Pet Alert">Missing Pet Alert</option><option value="Urgent Rescue Need">Urgent Rescue Need</option><option value="Active">Active</option><option value="Archived">Archived</option></select></div></div>
+        <div class="admin-table-wrap"><table class="admin-table" id="announcementsTable"><thead><tr><th>Title</th><th>Type</th><th>Organization</th><th>Posted By</th><th>Status</th><th>Date</th></tr></thead><tbody>
+          {% for announcement in announcements %}
+          <tr><td><strong>{{ announcement.title }}</strong><br><small>{{ announcement.body|truncatechars:80 }}</small></td><td>{{ announcement.get_type_display }}</td><td>{{ announcement.rescue_org.name }}</td><td>{% if announcement.posted_by %}{{ announcement.posted_by.username }}{% else %}—{% endif %}</td><td><span class="admin-pill {% if announcement.is_active %}ok{% else %}muted{% endif %}">{% if announcement.is_active %}Active{% else %}Archived{% endif %}</span></td><td>{{ announcement.created_at|date:"M d, Y" }}</td></tr>
+          {% empty %}<tr><td colspan="6" class="admin-empty">No announcements found.</td></tr>{% endfor %}
+        </tbody></table></div><div class="admin-pagination" data-paginate-for="announcementsTable" data-page-size="8"></div>
+      </div>
+    </section>
+
+    <section class="admin-tab" id="tab-notifications">
+      <div class="card">
+        <div class="card-header admin-table-header"><h3 class="card-title">Admin Notifications</h3><div class="admin-table-tools"><input class="admin-table-search" type="search" placeholder="Search notifications…" data-admin-notif-search><select class="admin-table-filter" data-admin-notif-filter><option value="">All notifications</option><option value="unread">Unread only</option><option value="read">Read only</option><option value="report">Reports</option><option value="inquiry">Inquiries</option><option value="announcement">Announcements</option><option value="message">Messages</option></select><form method="post" action="{% url 'user_mark_notifications_read' %}" id="adminMarkReadForm" data-skip-action-modal="true">{% csrf_token %}<button class="card-action" type="submit">Mark all read</button></form></div></div>
+        <div class="admin-list">
+          {% for notification in notifications %}
+            <div class="admin-list-item {% if not notification.is_read %}unread{% endif %}" data-admin-page-row data-admin-notif-item data-notif-read="{% if notification.is_read %}read{% else %}unread{% endif %}" data-notif-type="{{ notification.type }}"><div><strong>{{ notification.title }}</strong><p>{{ notification.body|default:notification.get_type_display }}</p></div><span class="admin-muted">{{ notification.created_at|timesince }} ago</span></div>
+          {% empty %}<p class="admin-empty">No notifications.</p>{% endfor %}
+        </div><div class="admin-pagination" data-paginate-list="tab-notifications" data-page-size="8"></div>
+      </div>
+    </section>
+
+    <section class="admin-tab" id="tab-audit">
+      <div class="card admin-table-card">
+        <div class="card-header admin-table-header"><h3 class="card-title">Admin Audit Logs</h3><div class="admin-table-tools"><input class="admin-table-search" type="search" placeholder="Search audit logs…" data-table-search="auditTable"><select class="admin-table-filter" data-table-filter="auditTable"><option value="">All actions</option><option value="User Active Status Changed">User changes</option><option value="Organization Active Status Changed">Organization changes</option><option value="Report Status Updated">Report updates</option><option value="CSV Exported">Exports</option></select></div></div>
+        <div class="admin-table-wrap"><table class="admin-table" id="auditTable"><thead><tr><th>Time</th><th>Admin</th><th>Action</th><th>Target</th><th>Details</th></tr></thead><tbody>
+          {% for log in audit_logs %}<tr data-admin-page-row><td>{{ log.created_at|date:"M d, Y g:i A" }}</td><td>{% if log.actor %}{{ log.actor.username }}{% else %}System{% endif %}</td><td>{{ log.get_action_display }}</td><td>{{ log.target_label }}</td><td>{{ log.details }}</td></tr>{% empty %}<tr><td colspan="5" class="admin-empty">No admin actions logged yet.</td></tr>{% endfor %}
+        </tbody></table></div><div class="admin-pagination" data-paginate-for="auditTable" data-page-size="8"></div>
+      </div>
+    </section>
+  </div>
+</div>
+
+<div class="admin-modal-overlay" id="adminReportModal"><div class="admin-modal"><button class="admin-modal-close" type="button" onclick="closeAdminModal('adminReportModal')">×</button><h3>Report Details</h3><div class="admin-detail-grid" id="adminReportDetails"></div></div></div>
+<div class="admin-modal-overlay" id="adminAnimalModal"><div class="admin-modal"><button class="admin-modal-close" type="button" onclick="closeAdminModal('adminAnimalModal')">×</button><h3>Animal Details</h3><div class="admin-detail-grid" id="adminAnimalDetails"></div></div></div>
+
+
+{% if messages %}
+  <div id="serverFlashMessages" hidden>
+    {% for message in messages %}
+      <div data-flash-message="{{ message|escapejs }}" data-flash-tags="{{ message.tags }}"></div>
+    {% endfor %}
+  </div>
+{% endif %}
+<script>
+const d = new Date();
+const dateEl = document.getElementById('greeting-date');
+if (dateEl) dateEl.textContent = d.toLocaleDateString('en-PH', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
+
+function showAdminTab(tabName, btn) {
+  const target = document.getElementById('tab-' + tabName);
+  if (!target) return;
+
+  document.querySelectorAll('.admin-tab').forEach(tab => tab.classList.remove('active'));
+  target.classList.add('active');
+
+  document.querySelectorAll('[data-admin-nav]').forEach(item => item.classList.remove('active'));
+  const navBtn = btn || document.querySelector(`[data-admin-nav="${tabName}"]`);
+  if (navBtn) navBtn.classList.add('active');
+
+  if (history.replaceState) history.replaceState(null, '', '#admin-' + tabName);
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+const initialAdminTab = (location.hash || '').replace('#admin-', '');
+if (initialAdminTab && document.getElementById('tab-' + initialAdminTab)) {
+  showAdminTab(initialAdminTab, document.querySelector(`[data-admin-nav="${initialAdminTab}"]`));
+}
+
+function countUp(el) {
+  const target = parseInt(el.dataset.target || '0', 10);
+  const duration = 900;
+  const start = performance.now();
+  const step = ts => {
+    const p = Math.min((ts - start) / duration, 1);
+    el.textContent = Math.round((1 - Math.pow(1 - p, 3)) * target);
+    if (p < 1) requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
+}
+document.querySelectorAll('.count-up').forEach(countUp);
+
+function applyAdminTableFilters(tableId) {
+  const table = document.getElementById(tableId);
+  if (!table) return;
+  const search = document.querySelector(`[data-table-search="${tableId}"]`);
+  const filter = document.querySelector(`[data-table-filter="${tableId}"]`);
+  const q = (search?.value || '').toLowerCase().trim();
+  const selected = (filter?.value || '').toLowerCase().trim();
+
+  table.querySelectorAll('tbody tr').forEach(row => {
+    const text = row.textContent.toLowerCase();
+    const matchesSearch = !q || text.includes(q);
+    const matchesFilter = !selected || text.includes(selected);
+    row.dataset.filterVisible = (matchesSearch && matchesFilter) ? '1' : '0';
+    row.style.display = row.dataset.filterVisible === '1' ? '' : 'none';
+  });
+  paginateAdminTable(tableId);
+}
+
+document.querySelectorAll('[data-table-search]').forEach(input => {
+  input.addEventListener('input', () => { adminPaginationState[input.dataset.tableSearch] = 1; applyAdminTableFilters(input.dataset.tableSearch); });
+});
+document.querySelectorAll('[data-table-filter]').forEach(select => {
+  select.addEventListener('change', () => { adminPaginationState[select.dataset.tableFilter] = 1; applyAdminTableFilters(select.dataset.tableFilter); });
+});
+
+function getAdminNotifCategory(type) {
+  const t = (type || '').toLowerCase();
+  if (t.includes('report') || t.includes('rescue')) return 'report';
+  if (t.includes('inquiry') || t.includes('adoption')) return 'inquiry';
+  if (t.includes('announcement')) return 'announcement';
+  if (t.includes('message') || t.includes('reply')) return 'message';
+  return 'other';
+}
+function applyAdminNotificationFilters() {
+  const search = document.querySelector('[data-admin-notif-search]');
+  const filter = document.querySelector('[data-admin-notif-filter]');
+  const q = (search?.value || '').toLowerCase().trim();
+  const selected = (filter?.value || '').toLowerCase().trim();
+  document.querySelectorAll('[data-admin-notif-item]').forEach(item => {
+    const text = item.textContent.toLowerCase();
+    const readState = item.dataset.notifRead;
+    const category = getAdminNotifCategory(item.dataset.notifType);
+    const matchesSearch = !q || text.includes(q);
+    const matchesFilter = !selected || selected === readState || selected === category;
+    item.style.display = (matchesSearch && matchesFilter) ? '' : 'none';
+  });
+  paginateAdminList('tab-notifications');
+}
+document.querySelector('[data-admin-notif-search]')?.addEventListener('input', () => { adminPaginationState['tab-notifications'] = 1; applyAdminNotificationFilters(); });
+document.querySelector('[data-admin-notif-filter]')?.addEventListener('change', () => { adminPaginationState['tab-notifications'] = 1; applyAdminNotificationFilters(); });
+
+
+function closeAdminModal(id) {
+  const modal = document.getElementById(id);
+  if (modal) modal.classList.remove('open');
+}
+function openAdminModal(id) {
+  const modal = document.getElementById(id);
+  if (modal) modal.classList.add('open');
+}
+document.querySelectorAll('.admin-modal-overlay').forEach(overlay => {
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.classList.remove('open'); });
+});
+function adminDetailRow(label, value) {
+  return `<div class="admin-detail-row"><span>${label}</span><strong>${value || '—'}</strong></div>`;
+}
+function openAdminReportDetails(btn) {
+  const d = btn.dataset;
+  const details = document.getElementById('adminReportDetails');
+  if (!details) return;
+  details.innerHTML = [
+    adminDetailRow('Report ID', '#' + (d.reportId || '')),
+    adminDetailRow('Animal', `${d.reportAnimal || '—'} · ${d.reportCondition || '—'}`),
+    adminDetailRow('Reporter', d.reportReporter),
+    adminDetailRow('Organization', d.reportOrg),
+    adminDetailRow('Location', d.reportLocation),
+    adminDetailRow('Priority', d.reportPriority),
+    adminDetailRow('Status', d.reportStatus),
+    adminDetailRow('Reported', d.reportDate),
+    `<div class="admin-detail-row wide"><span>Description</span><p>${d.reportDescription || '—'}</p></div>`
+  ].join('');
+  openAdminModal('adminReportModal');
+}
+function openAdminAnimalDetails(btn) {
+  const d = btn.dataset;
+  const details = document.getElementById('adminAnimalDetails');
+  if (!details) return;
+  details.innerHTML = [
+    adminDetailRow('Name', d.animalName),
+    adminDetailRow('Species', d.animalSpecies),
+    adminDetailRow('Breed', d.animalBreed),
+    adminDetailRow('Organization', d.animalOrg),
+    adminDetailRow('Status', d.animalStatus),
+    adminDetailRow('Adoption', d.animalAdoption),
+    adminDetailRow('Vaccination', d.animalVaccination),
+    adminDetailRow('Shelter', d.animalShelter),
+    adminDetailRow('Temperament', d.animalTemperament),
+    `<div class="admin-detail-row wide"><span>Medical Notes</span><p>${d.animalNotes || '—'}</p></div>`
+  ].join('');
+  openAdminModal('adminAnimalModal');
+}
+
+const adminPaginationState = {};
+function getVisibleRowsForTable(table) {
+  return Array.from(table.querySelectorAll('tbody tr')).filter(row => !row.classList.contains('admin-empty-row') && row.style.display !== 'none' && row.textContent.trim());
+}
+function renderAdminPagination(targetKey, rows, pageSize, renderPage) {
+  const pagers = document.querySelectorAll(`[data-paginate-for="${targetKey}"], [data-paginate-list="${targetKey}"]`);
+  const totalPages = Math.max(1, Math.ceil(rows.length / pageSize));
+  const current = Math.min(adminPaginationState[targetKey] || 1, totalPages);
+  adminPaginationState[targetKey] = current;
+  pagers.forEach(pager => {
+    pager.innerHTML = '';
+    if (rows.length <= pageSize) return;
+    const prev = document.createElement('button');
+    prev.type = 'button'; prev.className = 'pagination-button'; prev.textContent = 'Previous'; prev.disabled = current <= 1;
+    prev.onclick = () => { adminPaginationState[targetKey] = current - 1; renderPage(); };
+    const info = document.createElement('span'); info.className = 'admin-muted'; info.textContent = `Page ${current} of ${totalPages}`;
+    const next = document.createElement('button');
+    next.type = 'button'; next.className = 'pagination-button'; next.textContent = 'Next'; next.disabled = current >= totalPages;
+    next.onclick = () => { adminPaginationState[targetKey] = current + 1; renderPage(); };
+    pager.append(prev, info, next);
+  });
+}
+function paginateAdminTable(tableId) {
+  const table = document.getElementById(tableId);
+  if (!table) return;
+  const pager = document.querySelector(`[data-paginate-for="${tableId}"]`);
+  const pageSize = parseInt(pager?.dataset.pageSize || '8', 10);
+  const rows = getVisibleRowsForTable(table);
+  const current = adminPaginationState[tableId] || 1;
+  rows.forEach((row, index) => {
+    row.style.display = (index >= (current - 1) * pageSize && index < current * pageSize) ? '' : 'none';
+  });
+  renderAdminPagination(tableId, rows, pageSize, () => { applyAdminTableFilters(tableId); });
+}
+function paginateAdminList(sectionId) {
+  const section = document.getElementById(sectionId);
+  if (!section) return;
+  const pager = document.querySelector(`[data-paginate-list="${sectionId}"]`);
+  const pageSize = parseInt(pager?.dataset.pageSize || '8', 10);
+  const rows = Array.from(section.querySelectorAll('[data-admin-page-row]')).filter(row => row.style.display !== 'none');
+  const current = adminPaginationState[sectionId] || 1;
+  rows.forEach((row, index) => {
+    row.style.display = (index >= (current - 1) * pageSize && index < current * pageSize) ? '' : 'none';
+  });
+  renderAdminPagination(sectionId, rows, pageSize, () => { applyAdminNotificationFilters(); });
+}
+
+const activityCanvas = document.getElementById('activityChart');
+if (activityCanvas && window.Chart) {
+  fetch('/api/dashboard-stats/')
+    .then(res => res.json())
+    .then(data => {
+      const styles = getComputedStyle(document.documentElement);
+      new Chart(activityCanvas, {
+        type: 'bar',
+        data: {
+          labels: data.monthly_data.map(item => item.month),
+          datasets: [
+            {
+              label: 'Reports',
+              data: data.monthly_data.map(item => item.reports),
+              backgroundColor: 'rgba(90, 141, 232, 0.42)',
+              borderColor: styles.getPropertyValue('--blue').trim() || '#5A8DE8',
+              borderWidth: 1,
+              borderRadius: 10,
+              maxBarThickness: 54
+            },
+            {
+              label: 'Rescued',
+              data: data.monthly_data.map(item => item.rescued),
+              backgroundColor: 'rgba(232, 132, 90, 0.42)',
+              borderColor: styles.getPropertyValue('--amber').trim() || '#E8845A',
+              borderWidth: 1,
+              borderRadius: 10,
+              maxBarThickness: 54
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { position: 'top', labels: { usePointStyle: true, boxWidth: 8, padding: 18 } },
+            tooltip: { backgroundColor: '#3D2B1F', padding: 12, cornerRadius: 10 }
+          },
+          scales: {
+            y: { beginAtZero: true, ticks: { precision: 0 }, grid: { color: 'rgba(61,43,31,.08)' } },
+            x: { grid: { display: false } }
+          }
+        }
+      });
+    })
+    .catch(() => { activityCanvas.parentElement.innerHTML = '<p class="admin-empty">Chart unavailable.</p>'; });
+}
+
+['usersTable','orgsTable','reportsTable','animalsTable','announcementsTable','auditTable'].forEach(applyAdminTableFilters);
+applyAdminNotificationFilters();
+
+const markReadForm = document.getElementById('adminMarkReadForm');
+if (markReadForm) {
+  markReadForm.addEventListener('submit', async e => {
+    e.preventDefault();
+    const res = await fetch(markReadForm.action, { method:'POST', body: new FormData(markReadForm), headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+    const data = await res.json();
+    if (data.ok) {
+      document.querySelectorAll('[data-notif-count]').forEach(el => el.textContent = data.unread_count || 0);
+      document.querySelectorAll('.admin-list-item.unread').forEach(el => el.classList.remove('unread'));
+      if (window.showActionFeedback) window.showActionFeedback({ title: 'Notifications updated', message: 'All notifications were marked as read.' });
+    }
+  });
+}
+
+
+// Global action feedback modal for admin dashboard.
+(function initAdminActionFeedbackModal() {
+  function ensureModal() {
+    let overlay = document.getElementById('actionFeedbackModal');
+    if (overlay) return overlay;
+    overlay = document.createElement('div');
+    overlay.id = 'actionFeedbackModal';
+    overlay.className = 'action-feedback-overlay';
+    overlay.innerHTML = `
+      <div class="action-feedback-modal" role="dialog" aria-modal="true" aria-labelledby="actionFeedbackTitle">
+        <div class="action-feedback-icon" id="actionFeedbackIcon">✨</div>
+        <h3 class="action-feedback-title" id="actionFeedbackTitle">Confirm action</h3>
+        <p class="action-feedback-message" id="actionFeedbackMessage">Please confirm this action.</p>
+        <div class="action-feedback-actions">
+          <button type="button" class="action-feedback-btn action-feedback-cancel" id="actionFeedbackCancel">Cancel</button>
+          <button type="button" class="action-feedback-btn action-feedback-confirm" id="actionFeedbackConfirm">Continue</button>
+          <button type="button" class="action-feedback-btn action-feedback-confirm action-feedback-close" id="actionFeedbackClose">Got it</button>
+        </div>
+      </div>`;
+    document.body.appendChild(overlay);
+    return overlay;
+  }
+  function setModal({ mode = 'confirm', icon = '✨', title = 'Confirm action', message = 'Please confirm this action.', confirmText = 'Continue', onConfirm = null }) {
+    const overlay = ensureModal();
+    overlay.classList.remove('is-notice', 'is-processing');
+    if (mode === 'notice') overlay.classList.add('is-notice');
+    if (mode === 'processing') overlay.classList.add('is-processing');
+    overlay.querySelector('#actionFeedbackIcon').textContent = icon;
+    overlay.querySelector('#actionFeedbackTitle').textContent = title;
+    overlay.querySelector('#actionFeedbackMessage').textContent = message;
+    overlay.querySelector('#actionFeedbackConfirm').textContent = confirmText;
+    overlay.classList.add('show');
+    const cancel = overlay.querySelector('#actionFeedbackCancel');
+    const close = overlay.querySelector('#actionFeedbackClose');
+    const confirm = overlay.querySelector('#actionFeedbackConfirm');
+    const hide = () => overlay.classList.remove('show');
+    cancel.onclick = hide;
+    close.onclick = hide;
+    confirm.onclick = () => { if (onConfirm) onConfirm(); else hide(); };
+    overlay.onclick = (event) => { if (event.target === overlay && mode !== 'processing') hide(); };
+  }
+  window.showActionFeedback = function(options) { setModal({ mode: 'notice', icon: '✅', title: 'Action completed', message: 'Action completed successfully.', ...options }); };
+  window.showActionProcessing = function(options) { setModal({ mode: 'processing', icon: '', title: 'Working...', message: 'Please wait while the system processes your request.', ...options }); };
+  window.confirmActionFeedback = function(options) { setModal({ mode: 'confirm', ...options }); };
+
+  document.addEventListener('DOMContentLoaded', () => {
+    ensureModal();
+    document.querySelectorAll('[data-flash-message]').forEach(el => {
+      const tags = (el.dataset.flashTags || '').toLowerCase();
+      const isError = tags.includes('error') || tags.includes('danger');
+      window.showActionFeedback({
+        icon: isError ? '⚠️' : '✅',
+        title: isError ? 'Action needed' : 'Action completed',
+        message: el.dataset.flashMessage || el.textContent.trim() || 'Action completed.'
+      });
+    });
+    document.addEventListener('submit', (event) => {
+      const form = event.target;
+      if (!(form instanceof HTMLFormElement)) return;
+      if (form.dataset.skipActionModal === 'true' || form.dataset.actionConfirmed === 'true') return;
+      if ((form.method || 'get').toLowerCase() !== 'post') return;
+      const submitter = event.submitter;
+      const actionText = form.dataset.actionName || submitter?.textContent?.trim() || 'Save changes';
+      const lower = actionText.toLowerCase();
+      const isDestructive = lower.includes('deactivate') || lower.includes('archive') || lower.includes('delete') || lower.includes('remove');
+      event.preventDefault();
+      window.confirmActionFeedback({
+        icon: isDestructive ? '⚠️' : '✨',
+        title: form.dataset.confirmTitle || `${actionText}?`,
+        message: form.dataset.confirmMessage || 'This will apply your changes. Continue?',
+        confirmText: form.dataset.confirmText || actionText,
+        onConfirm: () => {
+          form.dataset.actionConfirmed = 'true';
+          window.showActionProcessing({ title: 'Processing action', message: 'Saving your changes...' });
+          form.submit();
+        }
+      });
+    });
+    document.addEventListener('click', (event) => {
+      const link = event.target.closest('a');
+      if (!link || link.dataset.skipActionModal === 'true') return;
+      const text = link.textContent.trim().toLowerCase();
+      const href = link.getAttribute('href') || '';
+      if (!text.includes('export') && !href.toLowerCase().includes('export')) return;
+      event.preventDefault();
+      window.confirmActionFeedback({
+        icon: '📄', title: 'Export CSV?',
+        message: 'The system will generate and download the CSV file.',
+        confirmText: 'Export',
+        onConfirm: () => {
+          window.showActionProcessing({ title: 'Preparing export', message: 'Your CSV download should start shortly.' });
+          const iframe = document.createElement('iframe');
+          iframe.style.display = 'none';
+          iframe.src = link.href;
+          document.body.appendChild(iframe);
+          setTimeout(() => {
+            window.showActionFeedback({ icon: '✅', title: 'Export ready', message: 'Your CSV download has started.' });
+            setTimeout(() => iframe.remove(), 4000);
+          }, 1200);
+        }
+      });
+    });
+  });
+})();
+</script>
+</body>
+</html>

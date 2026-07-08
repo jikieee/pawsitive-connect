@@ -1,0 +1,1027 @@
+{% load static %}
+{% load humanize %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Pawsitive Connect — My Dashboard</title>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,600;0,700;1,500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <link rel="stylesheet" href="/static/css/user_dashboard.css?v=phase3-4-polish"/>
+  <link rel="stylesheet" href="/static/css/phase3_mobile.css?v=phase3-4-polish"/>
+  <script defer src="/static/js/phase3_mobile.js?v=phase3-4-polish"></script>
+</head>
+<body data-user-role="{{ profile.role }}" data-user-id="{{ user.id }}"><meta name="csrf-token" content="{{ csrf_token }}">
+<form style="display:none;">{% csrf_token %}</form>
+<!-- ═══════════════════════════════════ SIDEBAR ═══════════════════════════════════ -->
+<aside class="sidebar" id="sidebar">
+  <div class="sidebar-brand">
+    <div class="brand-icon">🐾</div>
+    <div class="brand-text">
+      <strong>Pawsitive Connect</strong>
+      <span>My Dashboard</span>
+    </div>
+  </div>
+
+  <span class="nav-label">Main</span>
+  <button class="nav-item active" data-tab="home" onclick="showTab('home', this)">
+    <span class="nav-icon">🏠</span> Home
+  </button>
+  <button class="nav-item" data-tab="report" onclick="showTab('report', this)">
+    <span class="nav-icon">📍</span> Report a Stray
+  </button>
+  <button class="nav-item" data-tab="tracking" onclick="showTab('tracking', this)">
+    <span class="nav-icon">🔍</span> Track Rescue
+    <span class="nav-badge">{{ active_rescues }}</span>
+  </button>
+
+  <span class="nav-label">Animals</span>
+  <button class="nav-item" data-tab="browse" onclick="showTab('browse', this)">
+    <span class="nav-icon">🐾</span> Browse Animals
+  </button>
+  <button class="nav-item" data-tab="saved" onclick="showTab('saved', this)">
+    <span class="nav-icon">❤️</span> Saved Animals
+    <span class="nav-badge">{{ saved_count }}</span>
+  </button>
+  <button class="nav-item" data-tab="adoption" onclick="showTab('adoption', this)">
+    <span class="nav-icon">🏡</span> Adoption Interest
+  </button>
+
+  <span class="nav-label">Communication</span>
+  <button class="nav-item" data-tab="announcements" onclick="showTab('announcements', this)">
+    <span class="nav-icon">📢</span> Announcements
+  </button>
+
+  <span class="nav-label">Account</span>
+  <button class="nav-item" onclick="showTab('notifications', this)">
+    <span class="nav-icon">🔔</span> Notifications
+    <span class="nav-badge" data-notif-count>{{ unread_count }}</span>
+  </button>
+  <a class="nav-item" href="{% url 'profile_settings' %}">
+    <span class="nav-icon">⚙️</span> Settings
+  </a>
+  <a class="nav-item" href="{% url 'logout' %}">
+    <span class="nav-icon">↩</span> Logout
+  </a>
+
+  <div class="sidebar-footer">
+    <div class="user-card">
+      <div class="user-avatar">{% if profile.avatar %}<img src="{{ profile.avatar.url }}" alt="{{ user.username }}">{% else %}👤{% endif %}</div>
+      <div class="user-info">
+        <strong>{{ user.get_full_name|default:user.username }}</strong>
+        <span>Reporter · Member</span>
+      </div>
+    </div>
+  </div>
+</aside>
+
+<!-- ═══════════════════════════════════ MAIN ═══════════════════════════════════ -->
+<div class="main">
+
+  <!-- TOPBAR -->
+  <header class="topbar">
+    <button class="hamburger" onclick="toggleSidebar()">☰</button>
+    <div>
+      <div class="topbar-title" id="topbar-title">My Dashboard</div>
+      <div class="topbar-sub">Welcome back, {{ user.first_name|default:user.username }}</div>
+    </div>
+    <div class="topbar-end"></div>
+  </header>
+
+  <div class="content">
+    <!-- ════ TAB: HOME ════ -->
+    <section class="tab-section active" id="tab-home">
+      <div class="stats-grid">
+        <div class="stat-card amber">
+          <div class="stat-icon">📋</div>
+          <div class="stat-value">{{ reports_count }}</div>
+          <div class="stat-label">Reports Submitted</div>
+        </div>
+        <div class="stat-card teal">
+          <div class="stat-icon">🔍</div>
+          <div class="stat-value">{{ active_rescues }}</div>
+          <div class="stat-label">Active Rescues</div>
+        </div>
+        <div class="stat-card sage">
+          <div class="stat-icon">❤️</div>
+          <div class="stat-value">{{ saved_count }}</div>
+          <div class="stat-label">Saved Animals</div>
+        </div>
+        <div class="stat-card blue">
+          <div class="stat-icon">🔔</div>
+          <div class="stat-value" data-notif-count>{{ unread_count }}</div>
+          <div class="stat-label">New Notifications</div>
+        </div>
+      </div>
+
+      <div class="three-col">
+        <!-- My Recent Reports -->
+        <div class="card">
+          <div class="card-hd">
+            <h3>My Rescue Reports</h3>
+            <button class="btn btn-sm btn-outline" onclick="showTab('tracking', document.querySelectorAll('.nav-item')[2])">Track All</button>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr><th>Animal</th><th>Location</th><th>Status</th><th>Date</th></tr>
+              </thead>
+              <tbody>
+                  {% for report in my_reports %}
+                    <tr>
+                      <td>
+                        <div class="animal-cell">
+                          <div class="animal-thumb">{% with report_photo=report.photos.first %}{% if report.photo %}<img src="{{ report.photo.url }}" alt="Report photo">{% elif report_photo %}<img src="{{ report_photo.image.url }}" alt="Report photo">{% elif report.animal_type == 'dog' %}🐕{% elif report.animal_type == 'cat' %}🐈{% else %}🐾{% endif %}{% endwith %}</div>
+                          <div>
+                            <div class="animal-name">{{ report.get_animal_type_display }} · {{ report.get_condition_display }}</div>
+                            <div class="animal-sub">{{ report.location }}</div>
+                          </div>
+                        </div>
+                      </td>
+                      <td style="font-size:.8rem">📍 {{ report.location }}</td>
+                      <td>
+                        <span class="badge badge-{{ report.status }}">{{ report.get_status_display }}</span>
+                      </td>
+                      <td style="font-size:.76rem;color:var(--muted)">{{ report.reported_at|date:"M d" }}</td>
+                    </tr>
+                  {% empty %}
+                    <tr>
+                      <td colspan="4" style="text-align:center;color:var(--muted);padding:1.25rem;">You have not submitted any rescue reports yet.</td>
+                    </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+            <div class="card-actions" style="display:flex;flex-direction:column;gap:.75rem;margin-top:1rem">
+              <button class="btn btn-teal btn-full" onclick="showTab('browse', document.querySelectorAll('.nav-item')[3])">
+                🐾 Browse Rescued Animals
+              </button>
+              <button class="btn btn-outline btn-full" onclick="showTab('tracking', document.querySelectorAll('.nav-item')[2])">
+                🔍 Track My Reports
+              </button>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-hd">
+              <h3>🏡 Ready for Adoption</h3>
+              <span style="font-size:.75rem;color:var(--teal);font-weight:600">{{ adoption_ready.count }} animals</span>
+            </div>
+            <div class="card-body" style="display:flex;flex-direction:column;gap:.75rem">
+              {% for animal in adoption_ready|slice:":2" %}
+                <div style="display:flex;align-items:center;gap:.75rem">
+                  <div class="animal-thumb">{% with primary_photo=animal.photos.first %}{% if primary_photo %}<img src="{{ primary_photo.image.url }}" alt="{{ animal.display_name }}">{% elif animal.species == 'dog' %}🐕{% elif animal.species == 'cat' %}🐈{% else %}🐾{% endif %}{% endwith %}</div>
+                  <div style="flex:1">
+                    <div style="font-weight:600;font-size:.86rem">{{ animal.display_name }} <span style="font-weight:400;color:var(--muted)">· {{ animal.breed|default:'Mixed' }} · {{ animal.approx_age|default:'Unknown age' }}</span></div>
+                    <div style="font-size:.74rem;color:var(--muted)">{{ animal.rescue_org.name|default:'Unknown org' }} · {{ animal.shelter|default:'No shelter listed' }}</div>
+                  </div>
+                  <span class="badge badge-adoption">Available</span>
+                </div>
+              {% empty %}
+                <div style="color:var(--muted);font-size:.87rem">No animals are currently ready for adoption.</div>
+              {% endfor %}
+              <button class="btn btn-sm btn-outline" style="width:100%;justify-content:center" onclick="showTab('browse', document.querySelectorAll('.nav-item')[3])">
+                View all →
+              </button>
+            </div>
+          </div>
+        </div>
+    </section>
+
+    <!-- ════ TAB: REPORT A STRAY ════ -->
+    <section class="tab-section" id="tab-report">
+      <div class="section-hd">
+        <div>
+          <h2>Report a Stray Animal</h2>
+          <p>Help get a stray or injured animal rescued. Fill out the details below.</p>
+        </div>
+        <span class="badge badge-rescue" style="background:var(--amber-lt);color:var(--amber-dk);font-size:.82rem;padding:.4rem 1rem">📋 Report #{{ next_report_number }} will be assigned</span>
+      </div>
+
+      <div class="three-col">
+        <div style="display:flex;flex-direction:column;gap:1.25rem">
+          <div class="card">
+            <div class="card-body">
+              <div class="form-row">
+                <div class="form-group">
+                  <label class="form-label">Animal Type</label>
+                  <select class="form-control" name="animal_type">
+                    <option value="">Select species…</option>
+                    <option value="dog">Dog</option>
+                    <option value="cat">Cat</option>
+                    <option value="other">Other</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Condition</label>
+                  <select class="form-control" name="condition">
+                    <option value="">Select condition…</option>
+                    <option value="stray">Stray / Wandering</option>
+                    <option value="injured">Injured</option>
+                    <option value="sick">Sick / Ill</option>
+                    <option value="abandoned">Abandoned</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label">Description</label>
+                <textarea class="form-control" name="description" placeholder="Describe the animal: size, color, visible injuries, behavior…"></textarea>
+                <div class="form-hint">Be as specific as possible to help the rescue team identify the animal.</div>
+              </div>
+
+              <div class="form-group" style="margin-bottom:0">
+                <label class="form-label">Emergency Level</label>
+                <div class="emergency-options">
+                  <input type="radio" name="emergency" id="em-normal" class="emergency-opt" value="normal">
+                  <label for="em-normal" class="normal">🟢 Normal</label>
+                  <input type="radio" name="emergency" id="em-high" class="emergency-opt" value="high">
+                  <label for="em-high" class="high">🟡 High Priority</label>
+                  <input type="radio" name="emergency" id="em-critical" class="emergency-opt" value="critical" checked>
+                  <label for="em-critical" class="critical">🔴 Critical / Emergency</label>
+                </div>
+                <div class="form-hint">Select "Critical" if the animal is severely injured or in immediate danger.</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-body">
+              <div class="form-group" style="margin-bottom:0">
+                <label class="form-label">Upload Photos</label>
+                <div class="upload-zone" id="reportUploadZone">
+                  <div class="upload-icon">📷</div>
+                  <strong>Upload Animal Photos</strong>
+                  <p>Drag & drop or click · JPG, PNG · Max 5MB each · Up to 5 photos</p>
+                  <input type="file" name="photos" id="reportPhotosInput" accept="image/*" multiple style="margin-top:.75rem;width:100%">
+                </div>
+                <div id="reportPreviewContainer" class="preview-container" style="display:none; margin-top:1rem; gap:0.75rem;"></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card" style="background:linear-gradient(135deg,var(--amber-lt),var(--cream));border-color:rgba(232,132,90,.2)">
+            <div class="card-body">
+              <div style="font-size:1.5rem;margin-bottom:.5rem">⚡</div>
+              <div style="font-weight:600;font-size:.9rem;margin-bottom:.3rem">What happens next?</div>
+              <ol style="padding-left:1.2rem;font-size:.82rem;color:var(--brown-lt);line-height:1.8">
+                <li>Your report is submitted and assigned a number</li>
+                <li>A rescue organization reviews your report</li>
+                <li>A rescue team is dispatched to the location</li>
+                <li>You receive updates as the rescue progresses</li>
+                <li>The animal is brought to shelter and treated</li>
+              </ol>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-hd"><h3>📍 Pin Location</h3></div>
+          <div class="card-body">
+            <div id="reportMap" class="map-panel" style="margin-bottom:1rem;min-height:260px;border-radius:18px;overflow:hidden;border:1px solid var(--border)"></div>
+            <div id="reportMapHint" style="margin:.75rem 0 .25rem;font-size:.83rem;color:var(--muted)">Tap the map to drop a pin, then confirm the address and coordinates.</div>
+            <div class="form-group" style="margin-bottom:.75rem">
+              <label class="form-label">Address / Landmark</label>
+              <input type="text" class="form-control" name="address" placeholder="e.g., Near Rizal Park fountain, Manila">
+            </div>
+            <div class="form-row">
+              <div class="form-group" style="margin-bottom:0">
+                <label class="form-label">Latitude</label>
+                <input type="text" class="form-control" name="latitude" id="reportLatitude" placeholder="14.5896" style="background:var(--cream-dk)">
+              </div>
+              <div class="form-group" style="margin-bottom:0">
+                <label class="form-label">Longitude</label>
+                <input type="text" class="form-control" name="longitude" id="reportLongitude" placeholder="120.9786" style="background:var(--cream-dk)">
+              </div>
+            </div>
+            <div class="form-hint" style="margin-top:.5rem">Coordinates auto-filled when you pin on the map.</div>
+          </div>
+        </div>
+      </div>
+
+      <button class="btn btn-primary btn-full" style="margin-top:1.25rem;font-size:.95rem;padding:.85rem" onclick="submitReport(event)">
+        🚀 Submit Rescue Report
+      </button>
+    </section>
+
+    <!-- ════ TAB: TRACK RESCUE ════ -->
+    <section class="tab-section" id="tab-tracking">
+      <div class="section-hd">
+        <div>
+          <h2>Track Rescue Progress</h2>
+          <p>Follow the status of your submitted rescue reports</p>
+        </div>
+        <div class="tracking-tools">
+          <input type="search" class="form-control compact-search" placeholder="Search report, location, status…" data-tracking-search>
+          <button class="btn btn-sm btn-primary" type="button" data-tracking-filter="all">All</button>
+          <button class="btn btn-sm btn-outline" type="button" data-tracking-filter="active">Active</button>
+          <button class="btn btn-sm btn-outline" type="button" data-tracking-filter="closed">Closed</button>
+        </div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:1.25rem">
+
+        {% if my_reports_full.exists %}
+          {% for report in my_reports_full %}
+            <div class="card track-report-card" data-user-page-row data-report-status="{{ report.status }}" data-report-text="#{{ report.pk }} {{ report.get_animal_type_display }} {{ report.get_condition_display }} {{ report.location }} {{ report.get_status_display }} {% if report.rescue_org %}{{ report.rescue_org.name }}{% endif %}">
+              <div class="card-hd">
+                <div style="display:flex;align-items:center;gap:.75rem">
+                  <div class="animal-thumb">{% with report_photo=report.photos.first %}{% if report.photo %}<img src="{{ report.photo.url }}" alt="Report photo">{% elif report_photo %}<img src="{{ report_photo.image.url }}" alt="Report photo">{% elif report.animal_type == 'dog' %}🐕{% elif report.animal_type == 'cat' %}🐈{% else %}🐾{% endif %}{% endwith %}</div>
+                  <div>
+                    <div style="font-weight:600;font-size:.9rem">Report #{{ report.pk }} — {{ report.get_condition_display }}</div>
+                    <div style="font-size:.76rem;color:var(--muted)">📍 {{ report.location }} · Submitted {{ report.reported_at|date:"M d" }}{% if report.rescue_org %} · {{ report.rescue_org.name }} assigned{% endif %}</div>
+                  </div>
+                </div>
+                <span class="badge badge-{{ report.status }}">{{ report.get_status_display }}</span>
+              </div>
+              <div class="card-body">
+                <div class="timeline realtime-timeline">
+                  <div class="tl-step">
+                    <div class="tl-dot done">✓</div>
+                    <div class="tl-body"><div class="tl-title done">Report Submitted</div><div class="tl-sub">Your report was received and logged.</div></div>
+                    <div class="tl-time">{{ report.reported_at|date:"M d · P" }}</div>
+                  </div>
+                  {% if report.status_step >= 1 %}
+                  <div class="tl-step">
+                    <div class="tl-dot done">✓</div>
+                    <div class="tl-body"><div class="tl-title done">Seen by Organization</div><div class="tl-sub">A rescue partner has reviewed the report.</div></div>
+                    <div class="tl-time">{{ report.updated_at|date:"M d · P" }}</div>
+                  </div>
+                  {% endif %}
+                  {% if report.status_step >= 2 %}
+                  <div class="tl-step">
+                    <div class="tl-dot done">✓</div>
+                    <div class="tl-body"><div class="tl-title done">Rescue Team Dispatched</div><div class="tl-sub">A team is on the way to the reported location.</div></div>
+                    <div class="tl-time">{{ report.updated_at|date:"M d · P" }}</div>
+                  </div>
+                  {% endif %}
+                  {% if report.status_step >= 3 %}
+                  <div class="tl-step">
+                    <div class="tl-dot done">✓</div>
+                    <div class="tl-body"><div class="tl-title done">Animal Rescued</div><div class="tl-sub">The animal has been taken into rescue care.</div></div>
+                    <div class="tl-time">{{ report.updated_at|date:"M d · P" }}</div>
+                  </div>
+                  {% endif %}
+                  {% if report.status_step >= 4 %}
+                  <div class="tl-step">
+                    <div class="tl-dot done">✓</div>
+                    <div class="tl-body"><div class="tl-title done">Under Recovery</div><div class="tl-sub">Treatment and monitoring are in progress.</div></div>
+                    <div class="tl-time">{{ report.updated_at|date:"M d · P" }}</div>
+                  </div>
+                  {% endif %}
+                  {% if report.status_step >= 5 %}
+                  <div class="tl-step">
+                    <div class="tl-dot done">✓</div>
+                    <div class="tl-body"><div class="tl-title done">Closed</div><div class="tl-sub">The report is completed or ready for adoption follow-up.</div></div>
+                    <div class="tl-time">{{ report.updated_at|date:"M d · P" }}</div>
+                  </div>
+                  {% endif %}
+                  {% if report.status_step == 0 %}
+                  <div class="tl-step timeline-next-step">
+                    <div class="tl-dot active">⟳</div>
+                    <div class="tl-body"><div class="tl-title active">Waiting for organization review</div><div class="tl-sub">Updates will appear here only when the rescue organization takes action.</div></div>
+                    <div class="tl-time">Pending</div>
+                  </div>
+                  {% endif %}
+                </div>
+                {% if report.response_notes %}
+                  <div style="margin-top:1rem;background:var(--cream);border-radius:10px;padding:.75rem 1rem;font-size:.82rem;color:var(--brown-lt)">
+                    <strong>Latest update:</strong> {{ report.response_notes }}
+                    <div style="font-size:.73rem;color:var(--muted);margin-top:.25rem">Updated {{ report.updated_at|timesince }} ago</div>
+                  </div>
+                {% endif %}
+              </div>
+            </div>
+          {% endfor %}
+        {% else %}
+          <div class="card">
+            <div class="card-body" style="text-align:center;color:var(--muted);padding:2rem">
+              You have no rescue reports yet. Submit a report to track rescue progress here.
+            </div>
+          </div>
+        {% endif %}
+
+      </div>
+      <div class="user-pagination" data-user-paginate="tracking" data-page-size="4"></div>
+    </section>
+
+    <!-- ════ TAB: BROWSE ANIMALS ════ -->
+    <section class="tab-section" id="tab-browse">
+      <div class="section-hd">
+        <div>
+          <h2>Browse Rescued Animals</h2>
+          <p>All animals currently in the rescue network</p>
+        </div>
+        <span style="font-size:.83rem;color:var(--muted)">{{ all_animals_total }} animals total</span>
+      </div>
+
+      <form method="GET" class="filter-bar live-search-form" style="gap:.75rem;align-items:center;flex-wrap:wrap">
+        <input id="live-search-q" type="search" name="q" value="{{ query }}" placeholder="🔍  Search by name, breed, color…" style="width:220px" autocomplete="off" />
+
+        <label>
+          <span class="sr-only">Species</span>
+          <select name="species">
+            <option value="">All Species</option>
+            <option value="dog"{% if selected_species == 'dog' %} selected{% endif %}>Dog</option>
+            <option value="cat"{% if selected_species == 'cat' %} selected{% endif %}>Cat</option>
+            <option value="other"{% if selected_species == 'other' %} selected{% endif %}>Other</option>
+          </select>
+        </label>
+
+        <label>
+          <span class="sr-only">Status</span>
+          <select name="status">
+            <option value="">All Statuses</option>
+            <option value="observation"{% if selected_status == 'observation' %} selected{% endif %}>Under Observation</option>
+            <option value="recovering"{% if selected_status == 'recovering' %} selected{% endif %}>Recovering</option>
+            <option value="adoption"{% if selected_status == 'adoption' %} selected{% endif %}>Ready for Adoption</option>
+            <option value="adopted"{% if selected_status == 'adopted' %} selected{% endif %}>Adopted</option>
+          </select>
+        </label>
+
+        <input type="hidden" name="tab" value="browse" />
+        <button type="submit" class="btn btn-sm btn-primary">Apply Filters</button>
+
+        {% if query or selected_species or selected_status %}
+          <a href="{% url 'dashboard' %}?tab=browse" class="btn btn-sm btn-outline">Clear Filters</a>
+        {% endif %}
+      </form>
+
+      <div class="filter-chips" style="margin-bottom:1.25rem">
+        <button class="chip active" onclick="filterChip(this)">All</button>
+        <button class="chip" onclick="filterChip(this)">🏡 Ready for Adoption</button>
+        <button class="chip" onclick="filterChip(this)">🏥 Recovering</button>
+        <button class="chip" onclick="filterChip(this)">🐕 Dogs Only</button>
+        <button class="chip" onclick="filterChip(this)">🐈 Cats Only</button>
+        <button class="chip" onclick="filterChip(this)">❤️ My Saved</button>
+      </div>
+
+      <div class="animal-grid">
+        {% for animal in all_animals %}
+          <div class="animal-card" data-animal-id="{{ animal.id }}" onclick="openAnimalCard(event, '{{ animal.id }}')">
+            <div class="animal-img">
+              {% with primary_photo=animal.photos.first %}
+                {% if primary_photo %}
+                  <img src="{{ primary_photo.image.url }}" alt="{{ animal.display_name }}">
+                {% elif animal.species == 'dog' %}🐕{% elif animal.species == 'cat' %}🐈{% else %}🐾{% endif %}
+              {% endwith %}
+              <button class="heart-btn {% if animal.id in saved_ids_list %}saved{% endif %}" onclick="toggleSave(event, this)" data-animal-id="{{ animal.id }}" title="{% if animal.id in saved_ids_list %}Saved{% else %}Save{% endif %}">
+                {% if animal.id in saved_ids_list %}❤️{% else %}🤍{% endif %}
+              </button>
+            </div>
+            <div class="animal-card-body">
+              <div class="animal-card-status-centered">
+                <span class="badge {% if animal.status == 'adoption' %}badge-adoption{% elif animal.status == 'recovering' %}badge-recovery{% elif animal.status == 'observation' %}badge-submitted{% else %}badge{% endif %}">
+                  {{ animal.get_status_display }}
+                </span>
+              </div>
+              <div class="animal-card-name">{{ animal.display_name }}</div>
+              <div class="animal-card-scroll">
+                <div class="animal-card-detail-line">{{ animal.sex|capfirst }} · {{ animal.get_species_display }} · {{ animal.approx_age|default:'Unknown age' }}</div>
+                <div class="animal-card-detail-line">🏠 {{ animal.rescue_org.name|default:'Unknown shelter' }}</div>
+                <div class="animal-card-detail-line">📍 {{ animal.shelter|default:'No shelter listed' }}</div>
+                <div class="animal-card-detail-line">{% if animal.vaccination != 'none' %}💉 {{ animal.get_vaccination_display }}{% else %}⚠️ Needs vaccines{% endif %}</div>
+              </div>
+            </div>
+            <div class="animal-card-footer">
+              <button class="btn btn-sm btn-teal" style="flex:1" onclick="event.stopPropagation();openInterestForAnimal('{{ animal.id }}')">🏡 I'm Interested</button>
+            </div>
+          </div>
+        {% empty %}
+          <div class="no-results-card" style="grid-column:1/-1">
+            No animals are currently available for adoption.
+          </div>
+        {% endfor %}
+        <div id="browseNoResults" class="no-results-card" style="display:none;grid-column:1/-1">
+          No animals match your filters.
+        </div>
+      </div>
+      <div class="pagination-bar" style="display:flex;justify-content:center;gap:.75rem;align-items:center;margin-top:1rem;flex-wrap:wrap">
+        {% if page_obj.has_previous %}
+          <a class="pagination-button" href="{% url 'dashboard' %}?page={{ page_obj.previous_page_number }}&tab=browse{% if querystring %}&{{ querystring }}{% endif %}">Previous</a>
+        {% else %}
+          <span class="pagination-button disabled">Previous</span>
+        {% endif %}
+        {% for num in page_numbers %}
+          {% if num == '...' %}
+            <span class="pagination-ellipsis">…</span>
+          {% elif num == page_obj.number %}
+            <span class="pagination-button active">{{ num }}</span>
+          {% else %}
+            <a class="pagination-button" href="{% url 'dashboard' %}?page={{ num }}&tab=browse{% if querystring %}&{{ querystring }}{% endif %}">{{ num }}</a>
+          {% endif %}
+        {% endfor %}
+        {% if page_obj.has_next %}
+          <a class="pagination-button" href="{% url 'dashboard' %}?page={{ page_obj.next_page_number }}&tab=browse{% if querystring %}&{{ querystring }}{% endif %}">Next</a>
+        {% else %}
+          <span class="pagination-button disabled">Next</span>
+        {% endif %}
+      </div>
+    </section>
+
+    <!-- ════ TAB: SAVED ANIMALS ════ -->
+    <section class="tab-section" id="tab-saved">
+      <div class="section-hd">
+        <div>
+          <h2>Saved Animals</h2>
+          <p>Animals you've hearted — stay updated on their progress</p>
+        </div>
+        <span style="font-size:.83rem;color:var(--muted)">{{ saved_animals.count }} saved</span>
+      </div>
+
+      <div class="animal-grid">
+        {% for animal in saved_animals %}
+          <div class="animal-card" data-animal-id="{{ animal.id }}" onclick="openAnimalCard(event, '{{ animal.id }}')">
+            <div class="animal-img">
+              {% with primary_photo=animal.photos.first %}
+                {% if primary_photo %}
+                  <img src="{{ primary_photo.image.url }}" alt="{{ animal.display_name }}">
+                {% elif animal.species == 'dog' %}🐕{% elif animal.species == 'cat' %}🐈{% else %}🐾{% endif %}
+              {% endwith %}
+              <button class="heart-btn saved" onclick="toggleSave(event, this)" data-animal-id="{{ animal.id }}" title="Saved">❤️</button>
+            </div>
+            <div class="animal-card-body">
+              <div class="animal-card-status-centered">
+                <span class="badge {% if animal.status == 'adoption' %}badge-adoption{% elif animal.status == 'recovering' %}badge-recovery{% elif animal.status == 'observation' %}badge-submitted{% else %}badge{% endif %}">
+                  {{ animal.get_status_display }}
+                </span>
+              </div>
+              <div class="animal-card-name">{{ animal.display_name }}</div>
+              <div class="animal-card-scroll">
+                <div class="animal-card-detail-line">{{ animal.sex|capfirst }} · {{ animal.get_species_display }} · {{ animal.approx_age|default:'Unknown age' }}</div>
+                <div class="animal-card-detail-line">🏠 {{ animal.rescue_org.name|default:'Unknown shelter' }}</div>
+                <div class="animal-card-detail-line">📍 {{ animal.shelter|default:'No shelter listed' }}</div>
+                <div class="animal-card-detail-line">{% if animal.vaccination != 'none' %}💉 {{ animal.get_vaccination_display }}{% else %}⚠️ Needs vaccines{% endif %}</div>
+              </div>
+            </div>
+            <div class="animal-card-footer">
+              <button class="btn btn-sm btn-teal" style="flex:1" onclick="event.stopPropagation();openInterestForAnimal('{{ animal.id }}')">🏡 I'm Interested</button>
+            </div>
+          </div>
+        {% empty %}
+          <div class="no-results-card" style="grid-column:1/-1">You haven't saved any animals yet.</div>
+        {% endfor %}
+      </div>
+    </section>
+
+    <!-- ════ TAB: ADOPTION INTEREST ════ -->
+    <section class="tab-section" id="tab-adoption">
+      <div class="section-hd">
+        <div>
+          <h2>Adoption Interest</h2>
+          <p>Express interest and contact rescue organizations about animals you love</p>
+        </div>
+      </div>
+
+      <div class="two-col">
+        <div>
+          <!-- Sent Inquiries -->
+          <div class="card" style="margin-bottom:1.25rem">
+            <div class="card-hd"><h3>My Sent Inquiries</h3></div>
+            <div class="card-body" style="padding:0">
+              <div style="display:flex;flex-direction:column;gap:0">
+                {% if adoption_inquiries %}
+                  {% for inquiry in adoption_inquiries %}
+                    <div style="display:flex;align-items:center;gap:1rem;padding:1rem 1.5rem{% if not forloop.last %};border-bottom:1px solid var(--border){% endif %}">
+                      <div style="font-size:1.8rem">{% if inquiry.animal and inquiry.animal.species == 'dog' %}🐕{% elif inquiry.animal and inquiry.animal.species == 'cat' %}🐈{% else %}🐾{% endif %}</div>
+                      <div style="flex:1">
+                        <div style="font-weight:600;font-size:.87rem">{{ inquiry.animal.display_name|default:"Animal" }} <span style="font-weight:400;color:var(--muted)">· {{ inquiry.rescue_org.name|default:"Organization" }}</span></div>
+                        <div style="font-size:.76rem;color:var(--muted)">Sent {{ inquiry.created_at|date:"M d" }} · "{{ inquiry.message|truncatechars:80 }}"</div>
+                      </div>
+                      <span class="badge{% if inquiry.status == 'replied' %} badge-rescue{% endif %}" style="{% if inquiry.status == 'replied' %}background:var(--teal-lt);color:#2d7a7a{% else %}background:var(--gold-lt);color:#a07a10{% endif %}">{{ inquiry.get_status_display }}</span>
+                    </div>
+                  {% endfor %}
+                {% else %}
+                  <div style="padding:1rem 1.5rem;color:var(--muted)">You haven't sent any adoption inquiries yet.</div>
+                {% endif %}
+              </div>
+            </div>
+          </div>
+
+          <!-- Inquiry Conversations -->
+          <div class="card">
+            <div class="card-hd">
+              <h3>💬 Adoption Inquiry Conversations</h3>
+              <span style="font-size:.75rem;color:var(--muted)">{{ adoption_inquiries.count }} active</span>
+            </div>
+            <div class="card-body">
+              {% if adoption_inquiries %}
+                <div class="user-inquiry-layout">
+                  <div class="user-inquiry-list">
+                    {% for inquiry in adoption_inquiries %}
+                      <button type="button" class="user-inquiry-list-item{% if forloop.first %} active{% endif %}" data-open-user-inquiry="{{ inquiry.pk }}">
+                        <span class="user-inquiry-avatar">{% if inquiry.animal and inquiry.animal.species == 'dog' %}🐕{% elif inquiry.animal and inquiry.animal.species == 'cat' %}🐈{% else %}🐾{% endif %}</span>
+                        <span class="user-inquiry-copy">
+                          <strong>{{ inquiry.animal.display_name|default:'Animal' }}</strong>
+                          <small>{{ inquiry.rescue_org.name|default:'Organization' }} · {{ inquiry.get_status_display }}</small>
+                        </span>
+                      </button>
+                    {% endfor %}
+                  </div>
+                  <div class="user-inquiry-thread-wrap">
+                    {% for inquiry in adoption_inquiries %}
+                      <div class="user-inquiry-thread-panel{% if forloop.first %} active{% endif %}" data-user-inquiry-panel="{{ inquiry.pk }}">
+                        <div class="inquiry-thread-card" style="border:1px solid var(--border);border-radius:12px;padding:1rem;background:var(--cream)">
+                          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:.75rem;margin-bottom:.7rem">
+                            <div>
+                              <div style="font-weight:600;font-size:.9rem">{{ inquiry.animal.display_name|default:'Animal' }} · {{ inquiry.rescue_org.name|default:'Organization' }}</div>
+                              <div style="font-size:.74rem;color:var(--muted)">Status: {{ inquiry.get_status_display }} · Sent {{ inquiry.created_at|date:'M d, Y' }}</div>
+                            </div>
+                            <span class="badge{% if inquiry.status == 'replied' %} badge-rescue{% endif %}" style="{% if inquiry.status == 'replied' %}background:var(--teal-lt);color:#2d7a7a{% else %}background:var(--gold-lt);color:#a07a10{% endif %}">{{ inquiry.get_status_display }}</span>
+                          </div>
+                          <div style="background:white;border-radius:10px;padding:.75rem 1rem;font-size:.84rem;margin-bottom:.75rem;line-height:1.55">
+                            <div style="font-size:.72rem;color:var(--muted);margin-bottom:.25rem">Your inquiry</div>
+                            {{ inquiry.message }}
+                          </div>
+                          <div class="inquiry-thread-messages" style="display:flex;flex-direction:column;gap:.5rem;margin-bottom:.75rem">
+                            {% for message in inquiry.messages.all %}
+                              <div style="max-width:85%;padding:.7rem .9rem;border-radius:12px 12px {% if message.sender == user %}4px{% else %}12px{% endif %} 12px;background:{% if message.sender == user %}var(--amber);color:white{% else %}white{% endif %};font-size:.82rem;align-self:{% if message.sender == user %}flex-end{% else %}flex-start{% endif %}">
+                                {{ message.body }}
+                                <div style="font-size:.7rem;margin-top:.3rem;color:{% if message.sender == user %}rgba(255,255,255,.72){% else %}var(--muted){% endif %}">{{ message.sent_at|date:'M d · g:i A' }}{% if message.sender == user %} · You{% endif %}</div>
+                              </div>
+                            {% empty %}
+                              <div class="padded" style="background:white;border-radius:10px">No replies yet. The organization will reply here.</div>
+                            {% endfor %}
+                          </div>
+                          <form class="inquiry-reply-form" data-endpoint="/api/message/send/" data-role="user" data-recipient-id="{{ inquiry.rescue_org.members.first.user.id|default:'' }}" data-inquiry-id="{{ inquiry.pk }}" data-conversation-id="{% if inquiry.conversations.first %}{{ inquiry.conversations.first.pk }}{% endif %}" style="display:flex;gap:.5rem;align-items:flex-end;flex-wrap:wrap">
+                            {% csrf_token %}
+                            <input type="hidden" name="recipient_id" value="{{ inquiry.rescue_org.members.first.user.id|default:'' }}">
+                            <input type="hidden" name="inquiry_id" value="{{ inquiry.pk }}">
+                            <input type="hidden" name="conversation_id" value="{% if inquiry.conversations.first %}{{ inquiry.conversations.first.pk }}{% endif %}">
+                            <textarea class="form-control inquiry-reply-input" name="body" rows="3" placeholder="Reply to the organization…" style="flex:1;min-width:220px;min-height:96px"></textarea>
+                            <button type="submit" class="btn btn-primary">Send</button>
+                          </form>
+                        </div>
+                      </div>
+                    {% endfor %}
+                  </div>
+                </div>
+              {% else %}
+                <div class="padded">You have not sent any adoption inquiries yet.</div>
+              {% endif %}
+            </div>
+          </div>        </div>
+
+        <!-- New Inquiry Form -->
+        <div class="card">
+          <div class="card-hd"><h3>Send New Inquiry</h3></div>
+          <div class="card-body">
+            <div class="interest-card" style="margin-bottom:1.25rem">
+              <div class="interest-icon">🏡</div>
+              <h3>Interested in adopting?</h3>
+              <p>Fill out this short inquiry form to reach out to the rescue organization. Adoption happens outside this platform — we only connect you!</p>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Animal</label>
+              <select class="form-control" name="animal">
+                <option value="">Select an animal...</option>
+                {% for animal in adoption_ready %}
+                  <option value="{{ animal.id }}">{{ animal.display_name }} ({{ animal.get_species_display }} - {{ animal.rescue_org.name|default:"Unassigned" }})</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Your Living Situation</label>
+              <select class="form-control" name="living_situation">
+                <option value="house">House with yard</option>
+                <option value="condo">Condo / Apartment</option>
+                <option value="townhouse">Townhouse</option>
+                <option value="other">Other</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Do you have other pets?</label>
+              <select class="form-control" name="other_pets">
+                <option value="none">No other pets</option>
+                <option value="dogs">Yes - dogs</option>
+                <option value="cats">Yes - cats</option>
+                <option value="multiple">Yes - multiple</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Message to the Organization</label>
+              <textarea class="form-control" name="message" placeholder="Tell them why you're interested, your experience with animals, etc..." style="min-height:90px"></textarea>
+            </div>
+            <button class="btn btn-teal btn-full" onclick="submitInquiry(event)">
+              🏡 Send Adoption Inquiry
+            </button>
+            <div style="font-size:.74rem;color:var(--muted);text-align:center;margin-top:.6rem">
+              ℹ️ Adoption is handled directly by the organization outside this platform.
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ════ TAB: ANNOUNCEMENTS ════ -->
+    <section class="tab-section" id="tab-announcements">
+      <div class="section-hd">
+        <div>
+          <h2>Announcements</h2>
+          <p>Rescue updates, adoption announcements, and urgent alerts</p>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-hd"><h3>Latest Announcements</h3></div>
+        <div class="card-body">
+          {% if announcements %}
+            {% for announcement in announcements %}
+              <div class="announce-card">
+                <div class="announce-icon" style="background:{% if announcement.type == 'urgent' %}var(--red-lt){% elif announcement.type == 'adoption' %}var(--teal-lt){% elif announcement.type == 'missing' %}var(--amber-lt){% else %}var(--blue-lt){% endif %}">
+                  {% if announcement.type == 'urgent' %}🚨{% elif announcement.type == 'adoption' %}🏡{% elif announcement.type == 'missing' %}⚠️{% else %}📢{% endif %}
+                </div>
+                <div class="announce-body">
+                  <div class="announce-title">{{ announcement.title }}</div>
+                  <div class="announce-meta">{{ announcement.rescue_org.name }} &nbsp;·&nbsp; Posted {{ announcement.created_at|timesince }} ago</div>
+                  {% if announcement.photo %}
+                    <div style="margin-top:.5rem"><img src="{{ announcement.photo.url }}" alt="" style="width:100%;max-height:200px;object-fit:cover;border-radius:8px"></div>
+                  {% endif %}
+                  <div class="announce-text" style="margin-top:.5rem">{{ announcement.body|truncatechars:240 }}</div>
+                </div>
+              </div>
+            {% endfor %}
+          {% else %}
+            <div class="announce-card">
+              <div class="announce-body">
+                <div class="announce-title">No announcements yet</div>
+                <div class="announce-text">Organizations will post updates and alerts here.</div>
+              </div>
+            </div>
+          {% endif %}
+        </div>
+      </div>
+    </section>
+
+    <!-- ════ TAB: NOTIFICATIONS ════ -->
+    <section class="tab-section" id="tab-notifications">
+      <div class="section-hd">
+        <div>
+          <h2>Notifications</h2>
+          <p>Updates on rescues, animals, and messages</p>
+        </div>
+        <button class="btn btn-sm btn-outline" onclick="markAllNotificationsRead()">Mark all as read</button>
+      </div>
+
+      <div class="card">
+        <div class="card-hd">
+          <h3>All Notifications</h3>
+          <div class="notif-tools">
+            <input type="search" class="form-control compact-search" placeholder="Search notifications…" data-user-notif-search>
+            <button class="btn btn-sm btn-primary" type="button" data-user-notif-filter="all">All</button>
+            <button class="btn btn-sm btn-outline" type="button" data-user-notif-filter="rescue">Rescues</button>
+            <button class="btn btn-sm btn-outline" type="button" data-user-notif-filter="adoption">Adoption</button>
+            <button class="btn btn-sm btn-outline" type="button" data-user-notif-filter="message">Messages</button>
+          </div>
+        </div>
+        <div class="card-body" style="padding:.5rem 1.5rem">
+          <div class="notif-list">
+            {% for notif in notifications %}
+              <div class="notif-item-full{% if not notif.is_read %} unread{% endif %}" data-user-page-row data-user-notif-item data-notif-type="{{ notif.type }}">
+                <div class="notif-icon-lg" style="background:{% if notif.type == 'adoption_ready' %}var(--teal-lt){% elif notif.type == 'org_reply' or notif.type == 'new_user_message' %}var(--amber-lt){% elif notif.type == 'new_report' or notif.type == 'new_inquiry' %}var(--red-lt){% else %}var(--blue-lt){% endif %}">
+                  {% if notif.type == 'adoption_ready' %}🏡{% elif notif.type == 'org_reply' or notif.type == 'new_user_message' %}💬{% elif notif.type == 'new_report' or notif.type == 'new_inquiry' %}🚨{% else %}🐾{% endif %}
+                </div>
+                <div class="notif-text-full">
+                  <strong>{{ notif.title }}</strong>
+                  <p>{{ notif.body }}</p>
+                  <span>{{ notif.created_at|timesince }} ago{% if notif.report %} · Report #{{ notif.report.pk }}{% elif notif.animal %} · {{ notif.animal.display_name }}{% endif %}</span>
+                </div>
+              </div>
+            {% empty %}
+              <div class="notif-item-full">
+                <div class="notif-icon-lg" style="background:var(--cream-dk)">ℹ️</div>
+                <div class="notif-text-full">
+                  <strong>No notifications yet.</strong>
+                  <p>You will see updates here when rescue teams respond or organizations reply.</p>
+                  <span>Start by submitting a report or saving an animal.</span>
+                </div>
+              </div>
+            {% endfor %}
+          </div>
+          <div class="user-pagination" data-user-paginate="notifications" data-page-size="8"></div>
+        </div>
+      </div>
+    </section>
+
+  </div><!-- /content -->
+</div><!-- /main -->
+
+<!-- ════════════════════════ MODALS ════════════════════════ -->
+
+<!-- Report Success Modal -->
+<div class="modal-overlay" id="reportSuccessModal">
+  <div class="modal" style="text-align:center;max-width:420px">
+    <button class="modal-close" onclick="closeModal('reportSuccessModal')">✕</button>
+    <div style="font-size:4rem;margin-bottom:.75rem">🎉</div>
+    <div class="modal-title" style="text-align:center">Report Submitted!</div>
+    <p style="font-size:.88rem;color:var(--brown-lt);margin-bottom:1.25rem;line-height:1.6">Your rescue report <strong data-report-number>#{{ next_report_number }}</strong> has been submitted successfully. A rescue organization will review it and respond as soon as possible.</p>
+    <div style="background:var(--cream);border-radius:12px;padding:1rem;margin-bottom:1.25rem;text-align:left;font-size:.82rem">
+      <div style="display:flex;justify-content:space-between;padding:.3rem 0;border-bottom:1px solid var(--border)"><span style="color:var(--muted)">Report ID</span><strong data-report-number>#{{ next_report_number }}</strong></div>
+      <div style="display:flex;justify-content:space-between;padding:.3rem 0;border-bottom:1px solid var(--border)"><span style="color:var(--muted)">Assigned to</span><strong>Available rescue organization</strong></div>
+      <div style="display:flex;justify-content:space-between;padding:.3rem 0"><span style="color:var(--muted)">Status</span><span class="badge badge-submitted">Submitted</span></div>
+    </div>
+    <button class="btn btn-primary btn-full" onclick="closeModal('reportSuccessModal');showTab('tracking',document.querySelectorAll('.nav-item')[2])">
+      Track This Report →
+    </button>
+  </div>
+</div>
+
+<!-- Animal Profile Modal -->
+<div class="modal-overlay" id="animalProfileModal">
+  <div class="modal" style="max-width:560px">
+    <button class="modal-close" onclick="closeModal('animalProfileModal')">✕</button>
+    <div style="display:flex;gap:1.5rem;margin-bottom:1.25rem">
+      <div id="animalModalAvatar" style="width:110px;height:110px;background:linear-gradient(135deg,var(--cream-dk),var(--amber-lt));border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:4rem;flex-shrink:0">🐾</div>
+      <div>
+        <div id="animalModalName" style="font-family:'Playfair Display',serif;font-size:1.4rem;margin-bottom:.2rem">Animal Name</div>
+        <div id="animalModalSubtitle" style="color:var(--muted);font-size:.85rem">Species · Age · Sex</div>
+        <div style="margin-top:.5rem;display:flex;gap:.4rem;flex-wrap:wrap">
+          <span id="animalModalStatusBadge" class="badge badge-adoption">Status</span>
+          <span id="animalModalVaxBadge" class="badge badge-rescued">Vaccination</span>
+        </div>
+        <div id="animalModalOrg" style="font-size:.78rem;color:var(--muted);margin-top:.4rem">Organization · Shelter</div>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;margin-bottom:1rem">
+      <div style="background:var(--cream);border-radius:10px;padding:.7rem 1rem"><div style="font-size:.7rem;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:.2rem">Rescued On</div><div id="animalModalRescuedAt" style="font-size:.87rem;font-weight:600">Unknown</div></div>
+      <div style="background:var(--cream);border-radius:10px;padding:.7rem 1rem"><div style="font-size:.7rem;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:.2rem">Medical Status</div><div id="animalModalMedicalStatus" style="font-size:.87rem;font-weight:600">Pending</div></div>
+      <div style="background:var(--cream);border-radius:10px;padding:.7rem 1rem"><div style="font-size:.7rem;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:.2rem">Vaccination</div><div id="animalModalVaccination" style="font-size:.87rem;font-weight:600">Unknown</div></div>
+      <div style="background:var(--cream);border-radius:10px;padding:.7rem 1rem"><div style="font-size:.7rem;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:.2rem">Temperament</div><div id="animalModalTemperament" style="font-size:.87rem;font-weight:600">Unknown</div></div>
+    </div>
+    <div id="animalModalDescription" style="background:var(--cream);border-radius:10px;padding:.85rem 1rem;font-size:.83rem;line-height:1.55;margin-bottom:1.25rem">
+      Select an animal to view more details.
+    </div>
+    <div class="modal-footer" style="justify-content:space-between;align-items:center">
+      <button id="animalModalSaveBtn" class="btn btn-outline" onclick="toggleSave(event, this)" data-animal-id="" title="Save this animal">🤍 Save Animal</button>
+      <div style="display:flex;gap:.75rem">
+        <button class="btn btn-outline" onclick="closeModal('animalProfileModal')">Close</button>
+        <button id="animalModalInterestBtn" class="btn btn-teal" data-animal-id="" onclick="closeModal('animalProfileModal');openInterestForAnimal(this.dataset.animalId)">🏡 I'm Interested</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- I'm Interested / Adoption Inquiry Modal -->
+<div class="modal-overlay" id="interestModal">
+  <div class="modal" style="max-width:460px">
+    <button class="modal-close" onclick="closeModal('interestModal')">✕</button>
+    <div class="modal-title">🏡 Express Adoption Interest</div>
+    <div style="background:var(--teal-lt);border-radius:10px;padding:.75rem 1rem;margin-bottom:1.25rem;font-size:.82rem;color:#2d5a5a;border:1px solid rgba(79,168,168,.2)">
+      ℹ️ This sends an inquiry to the rescue organization. Adoption itself is arranged directly with them outside this platform.
+    </div>
+    <div class="form-group">
+      <label class="form-label">You're inquiring about</label>
+      <select class="form-control" id="interestModalAnimalId">
+        <option value="">Select an animal...</option>
+        {% for animal in adoption_ready %}
+          <option value="{{ animal.id }}">{{ animal.display_name }} — {{ animal.get_species_display }} at {{ animal.rescue_org.name|default:"Unassigned" }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Your Living Situation</label>
+      <select class="form-control" name="living_situation" id="interestModalLivingSituation"><option value="house">House with yard</option><option value="condo">Condo / Apartment</option><option value="townhouse">Townhouse</option></select>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Message</label>
+      <textarea class="form-control" name="message" id="interestModalMessage" placeholder="Tell them about yourself, your home, why you want to adopt…" style="min-height:90px"></textarea>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('interestModal')">Cancel</button>
+      <button class="btn btn-teal" onclick="submitInterestModalInquiry(event)">Send Inquiry</button>
+    </div>
+  </div>
+</div>
+
+<!-- Inquiry Sent Confirmation -->
+<div class="modal-overlay" id="inquirySentModal">
+  <div class="modal" style="text-align:center;max-width:400px">
+    <button class="modal-close" onclick="closeModal('inquirySentModal')">✕</button>
+    <div style="font-size:3.5rem;margin-bottom:.75rem">🐾</div>
+    <div class="modal-title" style="text-align:center">Inquiry Sent!</div>
+    <p style="font-size:.87rem;color:var(--brown-lt);line-height:1.6;margin-bottom:1.25rem">Your adoption inquiry has been sent to <strong>PAWS Manila</strong>. They'll review it and get back to you directly. You'll receive a notification when they reply!</p>
+    <button class="btn btn-primary btn-full" onclick="closeModal('inquirySentModal');showTab('adoption',document.querySelectorAll('.nav-item')[5])">
+      View My Inquiries →
+    </button>
+  </div>
+</div>
+
+<!-- ════════════════════════ SCRIPTS ════════════════════════ -->
+
+{% if messages %}
+  <div id="serverFlashMessages" hidden>
+    {% for message in messages %}
+      <div data-flash-message="{{ message|escapejs }}" data-flash-tags="{{ message.tags }}"></div>
+    {% endfor %}
+  </div>
+{% endif %}
+<script src="/static/js/dashboard.js?v=phase3-4-polish"></script>
+<script>
+  // Document ready - setup complete
+  document.addEventListener('DOMContentLoaded', () => {
+    console.log('User dashboard loaded');
+
+
+    const userPaginationState = {};
+    function renderUserPager(key, rows, pageSize, applyFn) {
+      const pager = document.querySelector(`[data-user-paginate="${key}"]`);
+      if (!pager) return;
+      const totalPages = Math.max(1, Math.ceil(rows.length / pageSize));
+      const current = Math.min(userPaginationState[key] || 1, totalPages);
+      userPaginationState[key] = current;
+      pager.innerHTML = '';
+      if (rows.length <= pageSize) return;
+      const prev = document.createElement('button');
+      prev.type = 'button'; prev.className = 'pagination-button'; prev.textContent = 'Previous'; prev.disabled = current <= 1;
+      prev.onclick = () => { userPaginationState[key] = current - 1; applyFn(); };
+      const info = document.createElement('span'); info.className = 'pagination-info'; info.textContent = `Page ${current} of ${totalPages}`;
+      const next = document.createElement('button');
+      next.type = 'button'; next.className = 'pagination-button'; next.textContent = 'Next'; next.disabled = current >= totalPages;
+      next.onclick = () => { userPaginationState[key] = current + 1; applyFn(); };
+      pager.append(prev, info, next);
+    }
+    function paginateUserCards(key, selector, applyFn) {
+      const pager = document.querySelector(`[data-user-paginate="${key}"]`);
+      const pageSize = parseInt(pager?.dataset.pageSize || '8', 10);
+      const rows = Array.from(document.querySelectorAll(selector)).filter(item => item.dataset.filterVisible !== '0');
+      const current = userPaginationState[key] || 1;
+      rows.forEach((item, index) => {
+        item.style.display = (index >= (current - 1) * pageSize && index < current * pageSize) ? '' : 'none';
+      });
+      renderUserPager(key, rows, pageSize, applyFn);
+    }
+
+    function applyTrackingFilters(activeFilter = null) {
+      const search = document.querySelector('[data-tracking-search]');
+      const activeBtn = activeFilter
+        ? document.querySelector(`[data-tracking-filter="${activeFilter}"]`)
+        : document.querySelector('[data-tracking-filter].btn-primary');
+      const filter = activeFilter || activeBtn?.dataset.trackingFilter || 'all';
+      const q = (search?.value || '').toLowerCase().trim();
+
+      document.querySelectorAll('[data-tracking-filter]').forEach(btn => {
+        btn.classList.toggle('btn-primary', btn.dataset.trackingFilter === filter);
+        btn.classList.toggle('btn-outline', btn.dataset.trackingFilter !== filter);
+      });
+
+      document.querySelectorAll('.track-report-card').forEach(card => {
+        const status = (card.dataset.reportStatus || '').toLowerCase();
+        const text = ((card.dataset.reportText || '') + ' ' + card.textContent).toLowerCase();
+        const isClosed = ['closed', 'rescued'].includes(status);
+        const matchesStatus = filter === 'all' || (filter === 'closed' && isClosed) || (filter === 'active' && !isClosed);
+        const matchesSearch = !q || text.includes(q);
+        card.dataset.filterVisible = (matchesStatus && matchesSearch) ? '1' : '0';
+        card.style.display = card.dataset.filterVisible === '1' ? '' : 'none';
+      });
+      paginateUserCards('tracking', '.track-report-card', () => applyTrackingFilters());
+    }
+
+    document.querySelector('[data-tracking-search]')?.addEventListener('input', () => { userPaginationState.tracking = 1; applyTrackingFilters(); });
+    document.querySelectorAll('[data-tracking-filter]').forEach(btn => {
+      btn.addEventListener('click', () => { userPaginationState.tracking = 1; applyTrackingFilters(btn.dataset.trackingFilter); });
+    });
+
+    function notifCategory(type) {
+      const t = (type || '').toLowerCase();
+      if (t.includes('report') || t.includes('rescue')) return 'rescue';
+      if (t.includes('adoption') || t.includes('inquiry')) return 'adoption';
+      if (t.includes('message') || t.includes('reply')) return 'message';
+      return 'other';
+    }
+
+    function applyNotificationFilters(activeFilter = null) {
+      const search = document.querySelector('[data-user-notif-search]');
+      const activeBtn = activeFilter
+        ? document.querySelector(`[data-user-notif-filter="${activeFilter}"]`)
+        : document.querySelector('[data-user-notif-filter].btn-primary');
+      const filter = activeFilter || activeBtn?.dataset.userNotifFilter || 'all';
+      const q = (search?.value || '').toLowerCase().trim();
+
+      document.querySelectorAll('[data-user-notif-filter]').forEach(btn => {
+        btn.classList.toggle('btn-primary', btn.dataset.userNotifFilter === filter);
+        btn.classList.toggle('btn-outline', btn.dataset.userNotifFilter !== filter);
+      });
+
+      document.querySelectorAll('[data-user-notif-item]').forEach(item => {
+        const text = item.textContent.toLowerCase();
+        const matchesFilter = filter === 'all' || notifCategory(item.dataset.notifType) === filter;
+        const matchesSearch = !q || text.includes(q);
+        item.dataset.filterVisible = (matchesFilter && matchesSearch) ? '1' : '0';
+        item.style.display = item.dataset.filterVisible === '1' ? '' : 'none';
+      });
+      paginateUserCards('notifications', '[data-user-notif-item]', () => applyNotificationFilters());
+    }
+
+    document.querySelector('[data-user-notif-search]')?.addEventListener('input', () => { userPaginationState.notifications = 1; applyNotificationFilters(); });
+    document.querySelectorAll('[data-user-notif-filter]').forEach(btn => {
+      btn.addEventListener('click', () => { userPaginationState.notifications = 1; applyNotificationFilters(btn.dataset.userNotifFilter); });
+    });
+    applyTrackingFilters('all');
+    applyNotificationFilters('all');
+  });
+</script>
+</body>
+</html>

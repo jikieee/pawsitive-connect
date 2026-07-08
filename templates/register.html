@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Pawsitive Connect - Register</title>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,600;0,700;1,500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="/static/css/login.css?v=phase3-4-polish"/>
+  <script src="https://www.google.com/recaptcha/api.js" async defer></script>
+</head>
+<body class="register-page">
+<div class="panel-left register-left">
+  <div class="brand">
+    <div class="logo-ring">PC</div>
+    <h1>Pawsitive <em>Connect</em></h1>
+    <p>{% if selected_role == 'rescue_org' %}Create a rescue organization profile, receive reports, and coordinate rescue updates.{% else %}Create a reporter account to submit rescue reports, track progress, and receive adoption updates.{% endif %}</p>
+    <div class="register-benefits">
+      <span>✓ Secure login</span>
+      <span>✓ Role-based dashboard</span>
+      <span>✓ Notifications enabled</span>
+    </div>
+  </div>
+</div>
+
+<div class="panel-right register-right">
+  <div class="register-shell">
+    <div class="form-header register-header">
+      <span class="role-badge">{{ role_display }}</span>
+      <h2>Create {{ role_display }} Account</h2>
+      <p>{% if selected_role == 'rescue_org' %}Tell us about your organization so reports can be assigned clearly.{% else %}Basic details only — you can update your profile later.{% endif %}</p>
+      <a class="role-change-link" href="{% url 'role_select' %}">Change role</a>
+    </div>
+
+    {% if messages %}
+      <div class="messages-box">
+        {% for message in messages %}<div>{{ message }}</div>{% endfor %}
+      </div>
+    {% endif %}
+
+    {% if form.non_field_errors %}
+      <div class="messages-box">{{ form.non_field_errors }}</div>
+    {% endif %}
+
+    <form method="post" class="register-form">
+      {% csrf_token %}
+
+      <section class="register-card">
+        <div class="register-card-hd">
+          <strong>Account details</strong>
+          <span>Used for signing in</span>
+        </div>
+        <div class="register-grid">
+          <div class="form-group">
+            <label>Username</label>
+            <div class="input-wrap">{{ form.username }}</div>
+            {{ form.username.errors }}
+          </div>
+          <div class="form-group">
+            <label>Email</label>
+            <div class="input-wrap">{{ form.email }}</div>
+            {{ form.email.errors }}
+          </div>
+          <div class="form-group">
+            <label>Password</label>
+            <div class="input-wrap">{{ form.password1 }}</div>
+            {{ form.password1.errors }}
+          </div>
+          <div class="form-group">
+            <label>Confirm Password</label>
+            <div class="input-wrap">{{ form.password2 }}</div>
+            {{ form.password2.errors }}
+          </div>
+        </div>
+      </section>
+
+      <section class="register-card">
+        <div class="register-card-hd">
+          <strong>Personal contact</strong>
+          <span>{% if selected_role == 'rescue_org' %}Primary contact person{% else %}Your reporter profile{% endif %}</span>
+        </div>
+        <div class="register-grid">
+          <div class="form-group">
+            <label>First Name</label>
+            <div class="input-wrap">{{ form.first_name }}</div>
+            {{ form.first_name.errors }}
+          </div>
+          <div class="form-group">
+            <label>Last Name</label>
+            <div class="input-wrap">{{ form.last_name }}</div>
+            {{ form.last_name.errors }}
+          </div>
+          <div class="form-group">
+            <label>Phone</label>
+            <div class="input-wrap">{{ form.phone }}</div>
+            {{ form.phone.errors }}
+          </div>
+          <div class="form-group">
+            <label>Address</label>
+            <div class="input-wrap">{{ form.address }}</div>
+            {{ form.address.errors }}
+          </div>
+        </div>
+      </section>
+
+      {% if selected_role == 'rescue_org' %}
+        <section class="register-card register-card-accent">
+          <div class="register-card-hd">
+            <strong>Rescue organization profile</strong>
+            <span>Shown in reports, announcements, and animal profiles</span>
+          </div>
+          <div class="register-grid">
+            <div class="form-group">
+              <label>Organization Name</label>
+              <div class="input-wrap">{{ form.organization_name }}</div>
+              {{ form.organization_name.errors }}
+            </div>
+            <div class="form-group">
+              <label>Organization Phone</label>
+              <div class="input-wrap">{{ form.organization_phone }}</div>
+              {{ form.organization_phone.errors }}
+            </div>
+            <div class="form-group register-span-2">
+              <label>Organization Address</label>
+              <div class="input-wrap">{{ form.organization_address }}</div>
+              {{ form.organization_address.errors }}
+              <div class="register-help">Used together with coordinates to assign nearby rescue reports.</div>
+            </div>
+            <div class="form-group">
+              <label>Organization Latitude</label>
+              <div class="input-wrap">{{ form.organization_latitude }}</div>
+              {{ form.organization_latitude.errors }}
+            </div>
+            <div class="form-group">
+              <label>Organization Longitude</label>
+              <div class="input-wrap">{{ form.organization_longitude }}</div>
+              {{ form.organization_longitude.errors }}
+            </div>
+            <div class="form-group register-span-2">
+              <button type="button" class="register-location-btn" onclick="fillOrgLocation()">📍 Use my current location for coordinates</button>
+              <div class="register-help" id="orgLocationHint">Optional but recommended for automatic report assignment.</div>
+            </div>
+            <div class="form-group register-span-2">
+              <label>Organization Description</label>
+              <div class="input-wrap">{{ form.organization_description }}</div>
+              {{ form.organization_description.errors }}
+            </div>
+          </div>
+        </section>
+      {% endif %}
+
+      <section class="register-card register-footer-card">
+        <div class="g-recaptcha" data-sitekey="{{ recaptcha_site_key }}"></div>
+        <button type="submit" class="btn-login">Create {{ role_display }} Account</button>
+        <div class="signup-prompt">
+          Already have an account? <a href="{% url 'login' %}">Sign in</a>
+        </div>
+      </section>
+    </form>
+  </div>
+</div>
+<script>
+function fillOrgLocation() {
+  const hint = document.getElementById('orgLocationHint');
+  if (!navigator.geolocation) {
+    if (hint) hint.textContent = 'Location is not supported by this browser. Enter latitude and longitude manually.';
+    return;
+  }
+  if (hint) hint.textContent = 'Getting your location…';
+  navigator.geolocation.getCurrentPosition((pos) => {
+    const lat = document.getElementById('id_organization_latitude');
+    const lng = document.getElementById('id_organization_longitude');
+    if (lat) lat.value = pos.coords.latitude.toFixed(6);
+    if (lng) lng.value = pos.coords.longitude.toFixed(6);
+    if (hint) hint.textContent = 'Coordinates added. You may still edit them before submitting.';
+  }, () => {
+    if (hint) hint.textContent = 'Could not get location. Enter latitude and longitude manually.';
+  }, { enableHighAccuracy: true, timeout: 10000 });
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Pawsitive Connect — Select Your Role</title>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,600;0,700;1,500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="/static/css/role_select.css"/>
+</head>
+<body>
+
+<!-- LEFT PANEL -->
+<div class="panel-left">
+  <div class="paw-bg" id="pawBg"></div>
+
+  <div class="brand">
+    <div class="logo-ring">🐾</div>
+    <h1><em>Pawsitive</em><br>Connect</h1>
+    <p>Bridging compassionate hearts with animals in need — one paw at a time.</p>
+  </div>
+
+  <div class="stats-row">
+    <div class="stat-pill">
+      <strong>{{ landing_total_reports|default:0 }}</strong>
+      <span>Reports</span>
+    </div>
+    <div class="stat-pill">
+      <strong>{{ landing_rescued_count|default:0 }}</strong>
+      <span>Rescued</span>
+    </div>
+    <div class="stat-pill">
+      <strong>{{ landing_adoptable_count|default:0 }}</strong>
+      <span>Adoptable</span>
+    </div>
+  </div>
+
+  <div class="wave-divider"></div>
+</div>
+
+<!-- RIGHT PANEL -->
+<div class="panel-right">
+  <div class="form-header">
+    <h2>Choose your role 🎯</h2>
+    <p>Select which type of account you want to access.</p>
+  </div>
+
+  {% if messages %}
+  <div class="messages-box">
+    {% for message in messages %}⚠️ {{ message }}{% endfor %}
+  </div>
+  {% endif %}
+
+  <form method="POST" id="roleForm">
+    {% csrf_token %}
+
+    <div class="role-grid">
+      <!-- Reporter / User Role -->
+      <label class="role-card">
+        <input type="radio" name="role" value="reporter" required>
+        <div class="role-icon">📝</div>
+        <div class="role-info">
+          <h3>Reporter</h3>
+          <p>Report animals in need and help connect them with rescue organizations.</p>
+        </div>
+      </label>
+
+      <!-- Rescue Organization Role -->
+      <label class="role-card">
+        <input type="radio" name="role" value="rescue_org" required>
+        <div class="role-icon">🏥</div>
+        <div class="role-info">
+          <h3>Rescue Organization</h3>
+          <p>Manage rescue operations and coordinate animal rescues and adoptions.</p>
+        </div>
+      </label>
+
+      <!-- Admin Role -->
+      <label class="role-card">
+        <input type="radio" name="role" value="admin" required>
+        <div class="role-icon">⚙️</div>
+        <div class="role-info">
+          <h3>Administrator</h3>
+          <p>Oversee the platform and manage all systems and users.</p>
+        </div>
+      </label>
+    </div>
+
+    <button type="submit" class="btn-continue">Continue to Login</button>
+  </form>
+
+  <script>
+    // Animate paw prints on page load
+    function generatePawPrints() {
+      const pawBg = document.getElementById('pawBg');
+      const paws = ['🐾'];
+      for (let i = 0; i < 8; i++) {
+        const paw = document.createElement('span');
+        paw.textContent = paws[Math.floor(Math.random() * paws.length)];
+        paw.style.left = Math.random() * 100 + '%';
+        paw.style.top = Math.random() * 100 + '%';
+        paw.style.animationDelay = Math.random() * 2 + 's';
+        pawBg.appendChild(paw);
+      }
+    }
+    generatePawPrints();
+
+    // Disable submit button until role is selected
+    const form = document.getElementById('roleForm');
+    const radios = form.querySelectorAll('input[type="radio"]');
+    const submitBtn = form.querySelector('button[type="submit"]');
+
+    function updateButtonState() {
+      const isChecked = Array.from(radios).some(r => r.checked);
+      submitBtn.disabled = !isChecked;
+    }
+
+    radios.forEach(radio => {
+      radio.addEventListener('change', updateButtonState);
+    });
+
+    updateButtonState();
+  </script>
+</div>
+
+</body>
+</html>
